@@ -1,0 +1,2 @@
+ab5beadf36eb65171f0234c9ea43e39c34cdbdc6a4d6c60b1b150b3f130b343d  WaterLite-1.1.0.apk
+1771ed24e25f29374fa89278a5bc54a99a9a11c0da864c67ed25ff80ff4658c0  WaterLite-source-1.1.0.zip

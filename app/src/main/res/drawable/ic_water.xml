@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="@color/water_primary_container" android:pathData="M0,0H108V108H0Z" />
+    <path android:fillColor="@color/water_primary" android:pathData="M54,19C45,35 31,48 31,64C31,77 41,87 54,87C67,87 77,77 77,64C77,48 63,35 54,19Z" />
+    <path android:fillColor="@color/water_on_primary" android:pathData="M41,62C41,72 45,77 53,79L53,73C48,72 47,68 47,62Z" />
+</vector>
+
