@@ -11,6 +11,7 @@
     <color name="water_on_primary_container">#004BAF</color>
     <color name="water_error">#BA1A1A</color>
     <color name="water_on_error">#FFFFFF</color>
+    <color name="water_error_container">#FFEDEA</color>
     <color name="water_scrim">#A6000000</color>
     <color name="water_control_highlight">#240065EB</color>
     <bool name="water_light_system_bars">true</bool>

@@ -5,7 +5,7 @@ import android.content.Context;
 /** Shared color roles for custom views and the platform theme. */
 public final class AppPalette {
     public final int background, surface, surfaceVariant, text, textSecondary, outline;
-    public final int primary, onPrimary, primaryContainer, onPrimaryContainer, error, onError, scrim;
+    public final int primary, onPrimary, primaryContainer, onPrimaryContainer, error, onError, errorContainer, scrim;
 
     private AppPalette(Context context) {
         background=context.getColor(R.color.water_background);
@@ -20,6 +20,7 @@ public final class AppPalette {
         onPrimaryContainer=context.getColor(R.color.water_on_primary_container);
         error=context.getColor(R.color.water_error);
         onError=context.getColor(R.color.water_on_error);
+        errorContainer=context.getColor(R.color.water_error_container);
         scrim=context.getColor(R.color.water_scrim);
     }
 

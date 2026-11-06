@@ -1,100 +1,9 @@
-WaterLite 1.2.0 / versionCode 5
-Android 12L API32; drinking service responses mocked, no real SMS or dispenser commands.
-After full theme regressions, the canonical account URL was updated and independently checked against live public GitHub release metadata.
-
-[dark]
-PASS 88 checks
-No session opens login screen
-Keystore encryption round trip
-Token is not stored in plaintext
-QR query DID parser
-QR JSON DID parser
-QR supported path parser
-Unrelated QR rejected
-Malformed DID rejected
-QR decoder synthetic camera frame
-SMS login UI stores received token
-Authenticated device list sync
-Control token uses platform 1,1
-App login signature matches protocol vector
-Current device protocol headers
-Cold process restores a stop-capable hint rather than confirmed running state
-First fresh idle response clears stale cold-start state
-Cold-start running hardware stays stoppable
-Cold-start preserves short startup status-lag protection
-Refresh copy preserves cold-start reconciliation flag
-Update parser accepts newer stable release with APK
-Update comparison rejects same and older releases
-Update compares numeric versions rather than text
-Update ignores prereleases
-Update ignores drafts
-Update rejects invalid stable version tags
-Update ignores releases without an APK
-Update dialog displays version notes Cancel and GitHub
-Update link stays on the intended GitHub project release
-Page text meets WCAG contrast
-Card text meets WCAG contrast
-Secondary text meets WCAG contrast
-Primary button text meets WCAG contrast
-Stop button text meets WCAG contrast
-Tonal action text meets WCAG contrast
-MIUI primary is fixed and independent of wallpaper
-Native controls and dialogs share MIUI accent
-Circular action shares day/night fill 104
-Circular action shares day/night fill 105
-Circular action shares day/night fill 106
-Refresh is an accessible labeled icon button
-Refresh is above scan with matching width and right alignment
-Refresh icon shows an in-progress state
-Refresh icon reloads devices and ends progress state
-Refresh entry removed from overflow menu
-Start button uses MIUI primary color
-Start switches button immediately while request is pending
-One tap starts water and changes button without confirmation
-First delayed idle response does not hide stop button
-Stop button transitions to theme error color
-Repeated startup status lag is tolerated
-Automatic status check starts without manual refresh
-One tap sends real end endpoint even while status request is pending
-Older running response cannot undo successful stop
-Stopped button transitions back to MIUI primary
-Automatic hardware stop restores start and closes session without refresh
-Running device detected automatically without a local start marker
-Detected running device can be stopped with same end endpoint
-Rejected start restores start button
-Rejected stop remains stoppable instead of claiming idle
-Temporary polling failure preserves stop button
-Returning from background reconciles stopped hardware in one fresh check
-Still-running hardware remains stoppable on resume
-Slow status request is active before backgrounding
-Previous background request cannot delay fresh resume status
-Quick background return preserves startup idle protection
-Resume network failure never pretends hardware stopped
-Failed resume check retries and recovers without five extra rounds
-Wallet amount parsed
-Temporary API error keeps encrypted session and list
-Network failure keeps session
-Only explicit expiry requests reauthentication
-Devices survive expiry
-New login clears expiry flag
-Pin persists across store recreation
-Deleted remote favorite does not return after sync
-Device data isolated by phone account
-Disabled animations immediately show the correct running control
-Disabled animations immediately restore the idle control
-Disabled animations never start an infinite refresh spinner
-Refresh completes and restores icon with animations disabled
-Large device list scrolls with at least fourteen devices
-Refresh retains the device scroll container and position
-Unchanged refresh retains control button identity
-Retained row pin action updates the current refreshed device
-Pinning retains the device scroll container and position
-Left swipe smoothly reveals device actions
-Swipe pin action toggles pin
-Confirmed delete removes and persistently hides device
+WaterLite 1.3.0 / versionCode 6
+MuMu Player Android 12 (1080x1920, 420dpi); drinking service responses mocked, no real SMS or dispenser commands.
+Both color themes run the same instrumentation suite. Tests also exercise a real force-stop cold start and live GitHub release metadata.
 
 [light]
-PASS 88 checks
+PASS 96 checks
 No session opens login screen
 Keystore encryption round trip
 Token is not stored in plaintext
@@ -131,11 +40,14 @@ Stop button text meets WCAG contrast
 Tonal action text meets WCAG contrast
 MIUI primary is fixed and independent of wallpaper
 Native controls and dialogs share MIUI accent
-Circular action shares day/night fill 104
-Circular action shares day/night fill 105
-Circular action shares day/night fill 106
-Refresh is an accessible labeled icon button
-Refresh is above scan with matching width and right alignment
+Toolbar action is a small icon button 104
+Toolbar action is a small icon button 105
+Toolbar action is a small icon button 106
+Toolbar icon has an accessible label 104
+Toolbar icon has an accessible label 105
+Toolbar icon has an accessible label 106
+Refresh icon is accessible and unlabelled
+Toolbar order is refresh, scan, more on one row
 Refresh icon shows an in-progress state
 Refresh icon reloads devices and ends progress state
 Refresh entry removed from overflow menu
@@ -180,18 +92,25 @@ Refresh retains the device scroll container and position
 Unchanged refresh retains control button identity
 Retained row pin action updates the current refreshed device
 Pinning retains the device scroll container and position
+Empty device list shows scan guidance
+Device control is vertically centred in its card
 Left swipe smoothly reveals device actions
+Swipe pin glyph sits directly above its caption
+Pinned action shows a 45 degree pin and unpin caption
 Swipe pin action toggles pin
+Delete action exposes an accessible label
 Confirmed delete removes and persistently hides device
 
+[dark]
+PASS 95 checks (same suite before the final empty-state screenshot check; fixed MIUI night palette, contrast and dialog accent verified)
+
 [cold]
-PASS cold-process cold 3 checks
+PASS 3 checks
 Encrypted session survives force-stop and process restart
 Killed process resumes with idle hardware after first fresh status
 Cold-start idle recovery does not wait five polling rounds
 
 [updates]
-PASS cold-process updates 2 checks
+PASS 2 checks
 Public update metadata includes stable release with APK
 Update metadata uses current account URL
-

@@ -37,7 +37,7 @@ final class UpdateClient {
         }
     }
     private String read(String url) throws Exception {
-        HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(8000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","WaterLite/1.2.0");c.setRequestProperty("Accept","application/vnd.github+json, application/atom+xml");
+        HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(8000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","WaterLite/1.3.0");c.setRequestProperty("Accept","application/vnd.github+json, application/atom+xml");
         try{if(c.getResponseCode()!=200)throw new IOException("Update metadata unavailable");try(InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1){out.write(b,0,n);if(out.size()>2_000_000)throw new IOException("Update metadata too large");}return out.toString("UTF-8");}}finally{c.disconnect();}
     }
 }

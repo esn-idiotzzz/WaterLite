@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private int operationVersion;
     private final Map<String,Button> controlButtons=new HashMap<>();
     private final Map<String,TextView> statusLabels=new HashMap<>();
+    private final Map<String,View> statusDots=new HashMap<>();
     private final Map<String,ValueAnimator> controlAnimations=new HashMap<>();
     AppPalette palette;
     private final ArgbEvaluator colorEvaluator=new ArgbEvaluator();
@@ -47,7 +48,7 @@ public class MainActivity extends Activity {
     private View emptyDevices,deviceHint;
     private TextView accountLabel;
     private int renderVersion;
-    private Button refreshButton;
+    private ImageButton refreshButton, scanButton;
     private RotateDrawable refreshGlyph;
     private ObjectAnimator refreshAnimation;
     private boolean refreshing;
@@ -57,7 +58,7 @@ public class MainActivity extends Activity {
     private AlertDialog updateDialog;
     private void checkUpdate(){
         if(checkingUpdate)return;checkingUpdate=true;
-        updateWorker.execute(()->{UpdateClient.Release found=null;try{found=new UpdateClient().latest();}catch(Exception ignored){}final UpdateClient.Release release=found;handler.post(()->{checkingUpdate=false;if(isDestroyed())return;if(release!=null&&release.newerThan("1.2.0"))pendingUpdate=release;showUpdate();});});
+        updateWorker.execute(()->{UpdateClient.Release found=null;try{found=new UpdateClient().latest();}catch(Exception ignored){}final UpdateClient.Release release=found;handler.post(()->{checkingUpdate=false;if(isDestroyed())return;if(release!=null&&release.newerThan("1.3.0"))pendingUpdate=release;showUpdate();});});
     }
     private void showUpdate(){
         if(!foreground||busy||pendingUpdate==null||updateDialog!=null||pendingAddDialog!=null)return;
@@ -126,19 +127,23 @@ public class MainActivity extends Activity {
         animation.addUpdateListener(a->{fill.setColor((Integer)a.getAnimatedValue());b.setTextColor((Integer)colorEvaluator.evaluate(a.getAnimatedFraction(),fromText,onTarget));});
         animation.addListener(new AnimatorListenerAdapter(){@Override public void onAnimationEnd(Animator a){if(controlAnimations.get(id)==a)controlAnimations.remove(id);}});controlAnimations.put(id,animation);animation.start();
     }
-    private Button swipeAction(String label,int icon,int color,View.OnClickListener click){
-        Button b=button(label,false,click);b.setTextSize(12);b.setTextColor(color);b.setPadding(dp(4),0,dp(4),0);b.setGravity(Gravity.CENTER);b.setStateListAnimator(null);
-        android.graphics.drawable.Drawable glyph=getDrawable(icon).mutate();glyph.setTint(color);b.setCompoundDrawablesWithIntrinsicBounds(null,glyph,null,null);b.setCompoundDrawablePadding(dp(8));b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(color,28)),shape(Color.TRANSPARENT,16),null));return b;
+    private LinearLayout swipeAction(int icon,String label,int fg,int fill,View.OnClickListener click){
+        LinearLayout box=column();box.setGravity(Gravity.CENTER);box.setClickable(true);box.setFocusable(true);box.setContentDescription(label);
+        box.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(fg,36)),shape(fill,18),null));
+        ImageView glyph=new ImageView(this);glyph.setImageResource(icon);glyph.setImageTintList(ColorStateList.valueOf(fg));glyph.setScaleType(ImageView.ScaleType.CENTER_INSIDE);glyph.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        box.addView(glyph,new LinearLayout.LayoutParams(dp(22),dp(22)));
+        TextView caption=text(label,12,fg);caption.setGravity(Gravity.CENTER);caption.setIncludeFontPadding(false);caption.setSingleLine(true);
+        LinearLayout.LayoutParams tp=new LinearLayout.LayoutParams(-2,-2);tp.topMargin=dp(4);box.addView(caption,tp);
+        box.setOnClickListener(click);return box;
     }
-    private Button labeledAction(int icon,String label,int id,View.OnClickListener click){
-        int fill=getColor(R.color.water_action_fill),glyph=getColor(R.color.water_action_icon);Button b=button(label,false,click);b.setId(id);b.setContentDescription(label);b.setTextColor(glyph);b.setCompoundDrawablePadding(dp(8));Drawable d=getDrawable(icon).mutate();d.setTint(glyph);d.setBounds(0,0,dp(20),dp(20));b.setCompoundDrawablesRelative(d,null,null,null);b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(glyph,28)),shape(fill,28),null));b.setElevation(dp(1));return b;
-    }
-    private ImageButton actionButton(int icon,String label,int id,View.OnClickListener click){
-        int fill=getColor(R.color.water_action_fill),glyph=getColor(R.color.water_action_icon);
-        ImageButton b=new ImageButton(this);b.setId(id);b.setContentDescription(label);b.setTooltipText(label);b.setImageResource(icon);b.setImageTintList(ColorStateList.valueOf(glyph));b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);b.setPadding(dp(12),dp(12),dp(12),dp(12));b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(glyph,28)),shape(fill,28),null));b.setElevation(dp(1));b.setOnClickListener(click);return b;
+    private ImageButton toolbarButton(int icon,String label,int id,View.OnClickListener click){
+        ImageButton b=new ImageButton(this);b.setId(id);b.setContentDescription(label);b.setTooltipText(label);b.setImageResource(icon);b.setImageTintList(ColorStateList.valueOf(accent));b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);b.setPadding(dp(11),dp(11),dp(11),dp(11));
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(accent,32)),null,shape(Color.WHITE,22)));b.setElevation(0);b.setOnClickListener(click);return b;
     }
     private void updateRefreshButton(){
-        if(refreshButton==null)return;refreshButton.setEnabled(!busy);
+        if(refreshButton==null)return;
+        refreshButton.setEnabled(!busy);refreshButton.setAlpha(busy?.38f:1f);
+        if(scanButton!=null){scanButton.setEnabled(!busy);scanButton.setAlpha(busy?.38f:1f);}
         if(refreshing && animateMotion() && (refreshAnimation==null || !refreshAnimation.isRunning())){refreshAnimation=ObjectAnimator.ofInt(refreshGlyph,"level",0,10000);refreshAnimation.setDuration(900);refreshAnimation.setRepeatCount(ValueAnimator.INFINITE);refreshAnimation.setInterpolator(new LinearInterpolator());refreshAnimation.start();}
         else if((!refreshing||!animateMotion()) && refreshAnimation!=null){refreshAnimation.cancel();refreshAnimation=null;refreshGlyph.setLevel(0);}
     }
@@ -151,8 +156,8 @@ public class MainActivity extends Activity {
     private EditText field(String hint,int type){EditText e=new EditText(this);e.setSingleLine(true);e.setTextSize(17);e.setTextColor(ink);e.setHintTextColor(muted);e.setHighlightColor(tint);e.setHint(hint);e.setInputType(type);e.setPadding(dp(16),dp(12),dp(16),dp(12));GradientDrawable d=shape(card,12);d.setStroke(dp(1),palette.outline);e.setBackground(d);e.setMinHeight(dp(56));return e;}
     private void label(LinearLayout l,String label){TextView v=text(label,13,muted);v.setPadding(dp(2),0,0,dp(8));l.addView(v);}
     private void showLogin(){
-        refreshing=false;updateRefreshButton();refreshButton=null;
-        cancelControlAnimations();deviceRows.clear();controlButtons.clear();statusLabels.clear();deviceList=null;deviceScroll=null;
+        refreshing=false;updateRefreshButton();refreshButton=null;scanButton=null;
+        cancelControlAnimations();deviceRows.clear();controlButtons.clear();statusLabels.clear();statusDots.clear();deviceList=null;deviceScroll=null;
         loginPage=true;mount();ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);root.addView(scroll);
         LinearLayout body=column();body.setPadding(dp(24),dp(24),dp(24),dp(24));scroll.addView(body);
         TextView brand=text("轻饮水",16,accent);brand.setTypeface(null,Typeface.BOLD);body.addView(brand);gap(body,32);
@@ -199,49 +204,60 @@ public class MainActivity extends Activity {
         if(!loginPage&&deviceList!=null){renderDevices();return;}
         cancelControlAnimations();
         if(refreshAnimation!=null){refreshAnimation.cancel();refreshAnimation=null;}
-        deviceRows.clear();controlButtons.clear();statusLabels.clear();
+        deviceRows.clear();controlButtons.clear();statusLabels.clear();statusDots.clear();
         loginPage=false;captchaGeneration++;mount();LinearLayout page=column();root.addView(page,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout bar=horizontal();bar.setPadding(dp(24),dp(8),dp(12),dp(8));TextView app=text("轻饮水",17,accent);app.setTypeface(null,Typeface.BOLD);bar.addView(app,new LinearLayout.LayoutParams(0,dp(48),1));app.setGravity(Gravity.CENTER_VERTICAL);
-        ImageButton menu=actionButton(R.drawable.ic_more,"更多选项",106,v->menu(v));bar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(48)));page.addView(bar);
-        deviceScroll=new ScrollView(this);deviceScroll.setClipToPadding(false);page.addView(deviceScroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=column();body.setPadding(dp(24),dp(20),dp(24),dp(188));deviceScroll.addView(body);
-        TextView title=text("我的饮水机",30,ink);title.setTypeface(null,Typeface.BOLD);body.addView(title);gap(body,10);
-        accountLabel=text("",14,muted);body.addView(accountLabel);gap(body,20);
+        LinearLayout bar=horizontal();bar.setPadding(dp(20),dp(8),dp(10),dp(8));bar.setMinimumHeight(dp(56));TextView app=text("轻饮水",17,accent);app.setTypeface(null,Typeface.BOLD);bar.addView(app,new LinearLayout.LayoutParams(0,dp(48),1));app.setGravity(Gravity.CENTER_VERTICAL);
+        refreshButton=toolbarButton(R.drawable.ic_refresh,"刷新设备",104,v->refresh());LinearLayout.LayoutParams rbp=new LinearLayout.LayoutParams(dp(44),dp(44));rbp.rightMargin=dp(2);bar.addView(refreshButton,rbp);
+        scanButton=toolbarButton(R.drawable.ic_scan,"扫码添加",105,v->{if(!busy)startActivityForResult(new Intent(this,ScanActivity.class),200);});LinearLayout.LayoutParams sbp=new LinearLayout.LayoutParams(dp(44),dp(44));sbp.rightMargin=dp(2);bar.addView(scanButton,sbp);
+        ImageButton menu=toolbarButton(R.drawable.ic_more,"更多选项",106,v->menu(v));bar.addView(menu,new LinearLayout.LayoutParams(dp(44),dp(44)));page.addView(bar);
+        refreshGlyph=new RotateDrawable();refreshGlyph.setDrawable(getDrawable(R.drawable.ic_refresh));refreshGlyph.setFromDegrees(0);refreshGlyph.setToDegrees(360);refreshGlyph.setBounds(0,0,dp(22),dp(22));refreshGlyph.setTint(accent);refreshButton.setImageDrawable(refreshGlyph);
+        deviceScroll=new ScrollView(this);deviceScroll.setClipToPadding(false);page.addView(deviceScroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=column();body.setPadding(dp(24),dp(20),dp(24),dp(32));deviceScroll.addView(body);
+        TextView title=text("我的饮水机",28,ink);title.setTypeface(null,Typeface.BOLD);body.addView(title);gap(body,10);
+        accountLabel=text("",14,muted);body.addView(accountLabel);gap(body,18);
         notice=text(message,14,muted);notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(notice);gap(body,12);
-        LinearLayout empty=column();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(40),dp(24),dp(40));empty.setBackground(shape(card,24));
-        TextView drop=text("◉",48,accent);empty.addView(drop);gap(empty,20);empty.addView(text("还没有饮水机",21,ink));gap(empty,10);TextView help=text("扫描机身二维码，添加常用设备。\n账号收藏也会在刷新后显示。",15,muted);help.setGravity(Gravity.CENTER);empty.addView(help);body.addView(empty);emptyDevices=empty;
-        TextView hint=text("左划设备可置顶或删除",12,muted);hint.setPadding(0,0,0,dp(12));body.addView(hint);deviceHint=hint;
-        deviceList=column();body.addView(deviceList);
-        Button add=labeledAction(R.drawable.ic_scan,"扫码添加",105,v->{if(!busy)startActivityForResult(new Intent(this,ScanActivity.class),200);});add.setEnabled(!busy);
-        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(132),dp(56),Gravity.BOTTOM|Gravity.END);fp.setMargins(dp(24),0,dp(24),dp(24));root.addView(add,fp);
-        refreshButton=labeledAction(R.drawable.ic_refresh,"刷新",104,v->refresh());refreshButton.setContentDescription("刷新设备");refreshGlyph=new RotateDrawable();refreshGlyph.setDrawable(getDrawable(R.drawable.ic_refresh));refreshGlyph.setFromDegrees(0);refreshGlyph.setToDegrees(360);refreshGlyph.setBounds(0,0,dp(20),dp(20));refreshGlyph.setTint(getColor(R.color.water_action_icon));refreshButton.setCompoundDrawablesRelative(refreshGlyph,null,null,null);
-        FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(132),dp(56),Gravity.BOTTOM|Gravity.END);rp.setMargins(dp(24),0,dp(24),dp(96));root.addView(refreshButton,rp);renderDevices();
+        LinearLayout empty=column();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(24),dp(44),dp(24),dp(44));empty.setBackground(shape(card,24));
+        FrameLayout badge=new FrameLayout(this);badge.setBackground(shape(tint,36));ImageView drop=new ImageView(this);drop.setImageResource(R.drawable.ic_drop);drop.setImageTintList(ColorStateList.valueOf(accent));drop.setScaleType(ImageView.ScaleType.CENTER_INSIDE);badge.addView(drop,new FrameLayout.LayoutParams(dp(34),dp(34),Gravity.CENTER));LinearLayout.LayoutParams badgeLp=new LinearLayout.LayoutParams(dp(72),dp(72));badgeLp.gravity=Gravity.CENTER_HORIZONTAL;empty.addView(badge,badgeLp);gap(empty,18);
+        TextView emptyTitle=text("还没有饮水机",20,ink);emptyTitle.setTypeface(null,Typeface.BOLD);emptyTitle.setGravity(Gravity.CENTER);empty.addView(emptyTitle);gap(empty,8);
+        TextView help=text("点击右上角的扫码图标添加设备\n账号里收藏的饮水机会在刷新后显示",14,muted);help.setGravity(Gravity.CENTER);help.setLineSpacing(dp(4),1f);empty.addView(help);body.addView(empty);emptyDevices=empty;
+        TextView hint=text("左划设备可置顶或删除",12,muted);hint.setPadding(dp(2),0,0,dp(10));body.addView(hint);deviceHint=hint;
+        deviceList=column();body.addView(deviceList);renderDevices();
     }
     private void renderDevices(){
         setText(accountLabel,maskPhone(phone)+(wallet.isEmpty()?"":"  ·  "+wallet));setText(notice,message);
-        emptyDevices.setVisibility(devices.isEmpty()?View.VISIBLE:View.GONE);deviceHint.setVisibility(devices.isEmpty()?View.GONE:View.VISIBLE);
+        emptyDevices.setVisibility(devices.isEmpty()?View.VISIBLE:View.GONE);deviceHint.setVisibility(devices.isEmpty()?View.GONE:View.VISIBLE);if(devices.isEmpty()&&deviceScroll!=null)deviceScroll.scrollTo(0,0);
         List<Device> sorted=new ArrayList<>(devices);Collections.sort(sorted,(a,b)->Boolean.compare(b.pinned,a.pinned));
         Set<String> ids=new HashSet<>();for(Device d:sorted)ids.add(d.id);
         final Map<String,Float> oldTops=new HashMap<>();for(Map.Entry<String,SwipeRow> entry:deviceRows.entrySet())oldTops.put(entry.getKey(),entry.getValue().getTop()+entry.getValue().getTranslationY());
         boolean changed=false;
-        for(String id:new ArrayList<>(deviceRows.keySet()))if(!ids.contains(id)){SwipeRow row=deviceRows.remove(id);row.animate().cancel();deviceList.removeView(row);controlButtons.remove(id);statusLabels.remove(id);ValueAnimator animation=controlAnimations.remove(id);if(animation!=null)animation.cancel();changed=true;}
-        for(int i=0;i<sorted.size();i++){Device d=sorted.get(i);SwipeRow row=deviceRows.get(d.id);if(row==null){row=deviceRow(d);deviceRows.put(d.id,row);}row.device=d;setText(row.title,(d.pinned?"↑  ":"")+d.name);setText(row.pin,d.pinned?"取消置顶":"置顶");
-            if(deviceList.indexOfChild(row)!=i){row.animate().cancel();row.setTranslationY(0);if(row.getParent()!=null)deviceList.removeView(row);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);deviceList.addView(row,i,lp);changed=true;}}
+        for(String id:new ArrayList<>(deviceRows.keySet()))if(!ids.contains(id)){SwipeRow row=deviceRows.remove(id);row.animate().cancel();deviceList.removeView(row);controlButtons.remove(id);statusLabels.remove(id);statusDots.remove(id);ValueAnimator animation=controlAnimations.remove(id);if(animation!=null)animation.cancel();changed=true;}
+        for(int i=0;i<sorted.size();i++){Device d=sorted.get(i);SwipeRow row=deviceRows.get(d.id);if(row==null){row=deviceRow(d);deviceRows.put(d.id,row);}row.device=d;setText(row.title,d.name);setText(row.pinCaption,d.pinned?"取消置顶":"置顶");row.pinAction.setContentDescription(d.pinned?"取消置顶":"置顶");row.pinGlyph.setRotation(d.pinned?45f:0f);
+            if(deviceList.indexOfChild(row)!=i){row.animate().cancel();row.setTranslationY(0);if(row.getParent()!=null)deviceList.removeView(row);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(112));lp.bottomMargin=dp(12);deviceList.addView(row,i,lp);changed=true;}}
         updateDeviceViews();updateRefreshButton();
         if(changed){final int revision=++renderVersion;final int scroll=deviceScroll.getScrollY();final LinearLayout list=deviceList;final ScrollView viewport=deviceScroll;list.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener(){public boolean onPreDraw(){list.getViewTreeObserver().removeOnPreDrawListener(this);if(revision!=renderVersion||list!=deviceList)return true;viewport.scrollTo(0,scroll);for(Map.Entry<String,SwipeRow> entry:deviceRows.entrySet()){SwipeRow row=entry.getValue();Float top=oldTops.get(entry.getKey());if(animateMotion()&&top!=null){row.setTranslationY(top-row.getTop());row.animate().translationY(0).setDuration(220).setInterpolator(motionCurve).start();}}return true;}});}
     }
     private SwipeRow deviceRow(Device d){
-        SwipeRow row=new SwipeRow(this);row.device=d;row.setMinimumHeight(dp(128));
-        LinearLayout actions=horizontal();actions.setBackground(shape(palette.surfaceVariant,20));actions.setPadding(dp(4),dp(8),dp(4),dp(8));actions.setAlpha(0);actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        row.pin=swipeAction(d.pinned?"取消置顶":"置顶",com.joe.waterlite.R.drawable.ic_pin,ink,v->{if(busy)return;row.finishMotion();row.position(0);row.device.pinned=!row.device.pinned;save();showDevices();});Button remove=swipeAction("删除",com.joe.waterlite.R.drawable.ic_delete,danger,v->remove(row.device));actions.addView(row.pin,new LinearLayout.LayoutParams(0,-1,1));actions.addView(remove,new LinearLayout.LayoutParams(0,-1,1));FrameLayout.LayoutParams ap=new FrameLayout.LayoutParams(dp(152),-1,Gravity.END);row.addView(actions,ap);row.back=actions;
-        LinearLayout content=column();content.setMinimumHeight(dp(128));content.setPadding(dp(18),dp(18),dp(18),dp(18));content.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(ink,20)),shape(card,20),null));
-        LinearLayout first=horizontal();row.title=text("",18,ink);row.title.setTypeface(null,Typeface.BOLD);row.title.setMaxLines(2);first.addView(row.title,new LinearLayout.LayoutParams(0,-2,1));
+        SwipeRow row=new SwipeRow(this);row.device=d;row.setMinimumHeight(dp(112));
+        LinearLayout actions=horizontal();actions.setGravity(Gravity.CENTER_VERTICAL);actions.setPadding(dp(8),0,dp(8),0);actions.setAlpha(0);actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        row.pinAction=swipeAction(R.drawable.ic_pin,d.pinned?"取消置顶":"置顶",palette.onPrimaryContainer,palette.primaryContainer,v->{if(busy)return;row.finishMotion();row.position(0);row.device.pinned=!row.device.pinned;save();showDevices();});
+        row.pinGlyph=(ImageView)row.pinAction.getChildAt(0);row.pinCaption=(TextView)row.pinAction.getChildAt(1);row.pinGlyph.setRotation(d.pinned?45f:0f);
+        LinearLayout remove=swipeAction(R.drawable.ic_delete,"删除",danger,palette.errorContainer,v->remove(row.device));
+        LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,-1,1);pp.rightMargin=dp(8);actions.addView(row.pinAction,pp);actions.addView(remove,new LinearLayout.LayoutParams(0,-1,1));
+        FrameLayout.LayoutParams ap=new FrameLayout.LayoutParams(dp(176),-1,Gravity.END);ap.topMargin=dp(6);ap.bottomMargin=dp(6);row.addView(actions,ap);row.back=actions;
+        LinearLayout content=horizontal();content.setGravity(Gravity.CENTER_VERTICAL);content.setMinimumHeight(dp(112));content.setPadding(dp(18),dp(16),dp(18),dp(16));content.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(ink,20)),shape(card,20),null));
+        LinearLayout copy=column();copy.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleRow=horizontal();row.title=text(d.name,17,ink);row.title.setTypeface(null,Typeface.BOLD);row.title.setMaxLines(2);row.title.setEllipsize(TextUtils.TruncateAt.END);titleRow.addView(row.title,new LinearLayout.LayoutParams(0,-2,1));copy.addView(titleRow);
+        LinearLayout stateRow=horizontal();row.statusDot=new View(this);row.statusDot.setBackground(shape(statusColor(d),3));LinearLayout.LayoutParams dotLp=new LinearLayout.LayoutParams(dp(6),dp(6));dotLp.rightMargin=dp(8);dotLp.gravity=Gravity.CENTER_VERTICAL;stateRow.addView(row.statusDot,dotLp);
+        TextView sub=text(deviceState(d)+"  ·  "+d.id,13,muted);sub.setMaxLines(1);sub.setEllipsize(TextUtils.TruncateAt.END);statusLabels.put(d.id,sub);statusDots.put(d.id,row.statusDot);stateRow.addView(sub,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams srp=new LinearLayout.LayoutParams(-1,-2);srp.topMargin=dp(6);copy.addView(stateRow,srp);
+        content.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         Button control=button(d.canEnd()?"停止出水":"开始出水",true,v->control(row.device,!row.device.canEnd()));
+        control.setMinWidth(dp(96));control.setMinHeight(dp(44));control.setMinimumHeight(dp(44));control.setPadding(dp(18),0,dp(18),0);((GradientDrawable)((RippleDrawable)control.getBackground()).getDrawable(0)).setCornerRadius(dp(22));
         styleControl(d.id,control,d.canEnd(),false);control.setOnTouchListener((v,e)->{if(!animateMotion()){v.animate().cancel();v.setScaleX(1);v.setScaleY(1);return false;}if(e.getActionMasked()==MotionEvent.ACTION_DOWN)v.animate().scaleX(.97f).scaleY(.97f).setDuration(90).setInterpolator(motionCurve).start();else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL)v.animate().scaleX(1).scaleY(1).setDuration(150).setInterpolator(motionCurve).start();return false;});
-        control.setEnabled(!busy);controlButtons.put(d.id,control);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-2,dp(48));bp.leftMargin=dp(8);first.addView(control,bp);content.addView(first);gap(content,8);
-        TextView sub=text(deviceState(d)+"  ·  "+d.id,13,muted);statusLabels.put(d.id,sub);content.addView(sub);content.setOnLongClickListener(v->{if(busy)return true;new AlertDialog.Builder(this).setTitle(row.device.name).setItems(new String[]{row.device.pinned?"取消置顶":"置顶","修改名称","删除"},(a,n)->{if(busy)return;Device current=row.device;if(n==0){row.finishMotion();row.position(0);current.pinned=!current.pinned;save();showDevices();}else if(n==1)rename(current);else remove(current);}).show();return true;});
-        row.addView(content,new FrameLayout.LayoutParams(-1,-2));row.front=content;return row;
+        control.setEnabled(!busy);controlButtons.put(d.id,control);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-2,dp(44));bp.leftMargin=dp(12);bp.gravity=Gravity.CENTER_VERTICAL;content.addView(control,bp);
+        content.setOnLongClickListener(v->{if(busy)return true;new AlertDialog.Builder(this).setTitle(row.device.name).setItems(new String[]{row.device.pinned?"取消置顶":"置顶","修改名称","删除"},(a,n)->{if(busy)return;Device current=row.device;if(n==0){row.finishMotion();row.position(0);current.pinned=!current.pinned;save();showDevices();}else if(n==1)rename(current);else remove(current);}).show();return true;});
+        row.addView(content,new FrameLayout.LayoutParams(-1,-1));row.front=content;return row;
     }
-    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.2.0").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
+    private int statusColor(Device d){return d.canEnd()?danger:d.status==-1?muted:accent;}
+    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.3.0").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
     private void logout(){if(hasActive()){setMessage("请先结束正在进行的接水。",true);return;}new AlertDialog.Builder(this).setTitle("退出登录？").setMessage("已添加的饮水机和置顶设置会保留。").setNegativeButton("取消",null).setPositiveButton("退出",(a,w)->{generation++;store.logout();token="";message="";showLogin();}).show();}
     private void remove(Device d){if(busy)return;if(d.canEnd()){setMessage("请先停止这台设备的出水。",true);return;}new AlertDialog.Builder(this).setTitle("删除「"+d.name+"」？").setMessage("移除本应用快捷入口，之后可重新扫码添加。").setNegativeButton("取消",null).setPositiveButton("删除",(a,w)->{try{Set<String> ids=store.hidden(phone);ids.add(d.id);store.hidden(phone,ids);devices.remove(d);store.devices(phone,devices);showDevices();}catch(Exception e){setMessage(safeError(e),true);}}).show();}
     private void rename(Device d){EditText input=field("设备名称",InputType.TYPE_CLASS_TEXT);input.setText(d.name);new AlertDialog.Builder(this).setTitle("修改名称").setView(input).setNegativeButton("取消",null).setPositiveButton("保存",(a,w)->{String name=input.getText().toString().trim();if(!name.isEmpty()){d.name=name;save();showDevices();}}).show();}
@@ -249,7 +265,7 @@ public class MainActivity extends Activity {
     static String maskPhone(String p){return p.length()==11?p.substring(0,3)+" ···· "+p.substring(7):p;}
     private boolean hasActive(){for(Device d:devices)if(d.canEnd())return true;return false;}
     private String deviceState(Device d){return d.restored?"正在核实上次接水状态":d.canEnd()?"正在出水":d.status==-1?"正在自动检测状态":"空闲";}
-    private void updateDeviceViews(){for(Device d:devices){Button b=controlButtons.get(d.id);if(b!=null){setText(b,d.canEnd()?"停止出水":"开始出水");b.setEnabled(!busy);styleControl(d.id,b,d.canEnd(),true);}TextView label=statusLabels.get(d.id);if(label!=null)setText(label,deviceState(d)+"  ·  "+d.id);}}
+    private void updateDeviceViews(){for(Device d:devices){Button b=controlButtons.get(d.id);if(b!=null){setText(b,d.canEnd()?"停止出水":"开始出水");b.setEnabled(!busy);styleControl(d.id,b,d.canEnd(),true);}TextView label=statusLabels.get(d.id);if(label!=null)setText(label,deviceState(d)+"  ·  "+d.id);View dot=statusDots.get(d.id);if(dot!=null)dot.setBackground(shape(statusColor(d),3));}}
     @Override protected void onActivityResult(int r,int result,Intent data){super.onActivityResult(r,result,data);if(r==200&&result==RESULT_OK&&data!=null&&!loginPage)addDialog(data.getStringExtra("code"));}
     private void addDialog(String raw){
         String parsed=DeviceIdParser.parse(raw);LinearLayout box=column();box.setPadding(dp(24),dp(12),dp(24),0);EditText id=field("二维码内容或设备编号",InputType.TYPE_CLASS_TEXT);id.setText(parsed.isEmpty()?raw:parsed);box.addView(id);gap(box,16);EditText name=field("设备名称（可选）",InputType.TYPE_CLASS_TEXT);box.addView(name);
@@ -295,20 +311,21 @@ public class MainActivity extends Activity {
         });
     }
     private final class SwipeRow extends FrameLayout {
-        Device device;TextView title;Button pin;
+        Device device;TextView title,pinCaption;ImageView pinGlyph;LinearLayout pinAction;View statusDot;
         View front,back;float downX,downY,start;boolean dragging;ValueAnimator settling;VelocityTracker velocity;
         final int touchSlop,minimumFling,maximumFling;
         SwipeRow(Context c){super(c);setBackground(shape(card,20));setClipToOutline(true);ViewConfiguration configuration=ViewConfiguration.get(c);touchSlop=configuration.getScaledTouchSlop();minimumFling=configuration.getScaledMinimumFlingVelocity();maximumFling=configuration.getScaledMaximumFlingVelocity();}
-        private void position(float x){front.setTranslationX(x);float progress=Math.min(1,Math.abs(x)/dp(152));back.setAlpha(progress);back.setTranslationX(dp(12)*(1-progress));int importance=progress>.8f?View.IMPORTANT_FOR_ACCESSIBILITY_AUTO:View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;if(back.getImportantForAccessibility()!=importance)back.setImportantForAccessibility(importance);}
+        private int reveal(){return dp(176);}
+        private void position(float x){front.setTranslationX(x);float progress=Math.min(1,Math.abs(x)/reveal());back.setAlpha(progress);back.setTranslationX(dp(8)*(1-progress));int importance=progress>.8f?View.IMPORTANT_FOR_ACCESSIBILITY_AUTO:View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;if(back.getImportantForAccessibility()!=importance)back.setImportantForAccessibility(importance);}
         private void recycleVelocity(){if(velocity!=null){velocity.recycle();velocity=null;}}
-        private void finishMotion(){if(settling!=null){settling.cancel();settling=null;}animate().cancel();setTranslationY(0);if(front!=null)position(front.getTranslationX()<-dp(76)?-dp(152):0);dragging=false;recycleVelocity();}
+        private void finishMotion(){if(settling!=null){settling.cancel();settling=null;}animate().cancel();setTranslationY(0);if(front!=null)position(front.getTranslationX()<-reveal()/2f?-reveal():0);dragging=false;recycleVelocity();}
         @Override public boolean onInterceptTouchEvent(android.view.MotionEvent e){
             if(e.getActionMasked()==android.view.MotionEvent.ACTION_DOWN){if(settling!=null)settling.cancel();recycleVelocity();velocity=VelocityTracker.obtain();downX=e.getX();downY=e.getY();start=front.getTranslationX();dragging=false;}
             if(velocity!=null)velocity.addMovement(e);
             if(e.getActionMasked()==android.view.MotionEvent.ACTION_MOVE && !busy && Math.abs(e.getX()-downX)>touchSlop && Math.abs(e.getX()-downX)>Math.abs(e.getY()-downY)*1.3f){dragging=true;getParent().requestDisallowInterceptTouchEvent(true);return true;}
             if(!dragging&&(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL))recycleVelocity();return false;
         }
-        @Override public boolean onTouchEvent(android.view.MotionEvent e){if(!dragging)return super.onTouchEvent(e);if(velocity!=null)velocity.addMovement(e);if(e.getActionMasked()==MotionEvent.ACTION_MOVE){position(Math.max(-dp(152),Math.min(0,start+e.getX()-downX)));return true;}if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){float speed=0;if(velocity!=null){velocity.computeCurrentVelocity(1000,maximumFling);speed=velocity.getXVelocity();}float target=speed<-minimumFling?-dp(152):speed>minimumFling?0:front.getTranslationX()<-dp(76)?-dp(152):0;recycleVelocity();dragging=false;if(!animateMotion()||Math.abs(front.getTranslationX()-target)<1){position(target);return true;}settling=ValueAnimator.ofFloat(front.getTranslationX(),target);settling.setDuration(220);settling.setInterpolator(motionCurve);settling.addUpdateListener(a->position((Float)a.getAnimatedValue()));settling.start();return true;}return true;}
+        @Override public boolean onTouchEvent(android.view.MotionEvent e){if(!dragging)return super.onTouchEvent(e);if(velocity!=null)velocity.addMovement(e);if(e.getActionMasked()==MotionEvent.ACTION_MOVE){position(Math.max(-reveal(),Math.min(0,start+e.getX()-downX)));return true;}if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL){float speed=0;if(velocity!=null){velocity.computeCurrentVelocity(1000,maximumFling);speed=velocity.getXVelocity();}float target=speed<-minimumFling?-reveal():speed>minimumFling?0:front.getTranslationX()<-reveal()/2f?-reveal():0;recycleVelocity();dragging=false;if(!animateMotion()||Math.abs(front.getTranslationX()-target)<1){position(target);return true;}settling=ValueAnimator.ofFloat(front.getTranslationX(),target);settling.setDuration(220);settling.setInterpolator(motionCurve);settling.addUpdateListener(a->position((Float)a.getAnimatedValue()));settling.start();return true;}return true;}
         @Override protected void onDetachedFromWindow(){finishMotion();super.onDetachedFromWindow();}
     }
 }
