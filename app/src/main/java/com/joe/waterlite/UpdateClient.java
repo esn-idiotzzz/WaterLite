@@ -9,7 +9,7 @@ import android.text.Html;
 
 /** Public release metadata only; never attaches the drinking account token. */
 final class UpdateClient {
-    static final String PROJECT="https://github.com/zhouyangxin13-ai/WaterLite";
+    static final String PROJECT="https://github.com/esn-idiotzzz/WaterLite";
     static final class Release {
         final String version,notes,url;
         Release(String version,String notes){this.version=version;this.notes=notes;url=PROJECT+"/releases/tag/"+version;}
@@ -23,7 +23,7 @@ final class UpdateClient {
         return apk?new Release(tag,json.optString("body")):null;
     }
     Release latest() throws Exception {
-        try{return parse(new JSONObject(read("https://api.github.com/repos/zhouyangxin13-ai/WaterLite/releases/latest")));}
+        try{return parse(new JSONObject(read("https://api.github.com/repos/esn-idiotzzz/WaterLite/releases/latest")));}
         catch(IOException e){
             // Atom supplies both version and notes when GitHub's unauthenticated API is rate limited.
             XmlPullParser parser=Xml.newPullParser();parser.setInput(new StringReader(read(PROJECT+"/releases.atom")));

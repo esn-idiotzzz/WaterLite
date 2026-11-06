@@ -1,6 +1,6 @@
 WaterLite 1.2.0 / versionCode 5
-Android 12L API32, mocked service; no real SMS or dispenser commands.
-Same final signed APK used for dark/light/full regression and force-stop process restoration.
+Android 12L API32; drinking service responses mocked, no real SMS or dispenser commands.
+After full theme regressions, the canonical account URL was updated and independently checked against live public GitHub release metadata.
 
 [dark]
 PASS 88 checks
@@ -189,4 +189,9 @@ PASS cold-process cold 3 checks
 Encrypted session survives force-stop and process restart
 Killed process resumes with idle hardware after first fresh status
 Cold-start idle recovery does not wait five polling rounds
+
+[updates]
+PASS cold-process updates 2 checks
+Public update metadata includes stable release with APK
+Update metadata uses current account URL
 
