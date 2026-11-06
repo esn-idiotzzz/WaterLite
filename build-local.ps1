@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ToolsDir,[Parameter(Mandatory=$true)][string]$JavaHome,[Parameter(Mandatory=$true)][string]$SigningKey,[Parameter(Mandatory=$true)][string]$PasswordFile,[switch]$Tests)
+param([Parameter(Mandatory=$true)][string]$ToolsDir,[Parameter(Mandatory=$true)][string]$JavaHome,[Parameter(Mandatory=$true)][string]$SigningKey,[Parameter(Mandatory=$true)][string]$PasswordFile,[string]$LoginSaltFile,[switch]$Tests)
 $ErrorActionPreference = 'Stop'
 $taskJava = Join-Path $JavaHome 'bin'
 $taskTools = (Resolve-Path -LiteralPath $ToolsDir).Path
@@ -9,6 +9,10 @@ $taskClasses = Join-Path $taskBuild 'classes'
 New-Item -ItemType Directory -Force $taskClasses, "$taskBuild\generated" | Out-Null
 New-Item -ItemType Directory -Force "$taskBuild\dex" | Out-Null
 Invoke-Checked "$taskTools\build-tools\aapt.exe" @('package','-f','-m','-J',"$taskBuild\generated",'-M',"$taskSource\app\src\main\AndroidManifest.xml",'-S',"$taskSource\app\src\main\res",'-I',"$taskTools\android.jar",'-F',"$taskBuild\resources.apk")
+$taskSaltPath = $LoginSaltFile
+$taskSalt = if ($taskSaltPath -and (Test-Path -LiteralPath $taskSaltPath)) { (Get-Content -Raw -LiteralPath $taskSaltPath).Trim() } else { '' }
+$taskSaltEscaped = $taskSalt.Replace('\','\\').Replace('"','\"')
+Set-Content -LiteralPath "$taskBuild/generated/com/joe/waterlite/BuildConfig.java" -Encoding utf8 -Value ('package com.joe.waterlite; final class BuildConfig { static final String APP_LOGIN_SALT = "'+$taskSaltEscaped+'"; }')
 $taskSources = Get-ChildItem "$taskSource\app\src\main\java" -Recurse -Filter '*.java' | ForEach-Object FullName
 $taskSources += Get-ChildItem "$taskBuild\generated" -Recurse -Filter '*.java' | ForEach-Object FullName
 Invoke-Checked "$taskJava\javac.exe" (@('-encoding','UTF-8','--release','8','-classpath',"$taskTools\android.jar;$taskTools\zxing.jar",'-d',$taskClasses) + $taskSources)
@@ -18,8 +22,8 @@ Copy-Item "$taskBuild\resources.apk" "$taskBuild\unsigned.apk" -Force
 Push-Location "$taskBuild\dex"
 try { Invoke-Checked "$taskTools\build-tools\aapt.exe" @('add',"$taskBuild\unsigned.apk",'classes.dex') } finally { Pop-Location }
 Invoke-Checked "$taskTools\build-tools\zipalign.exe" @('-f','4',"$taskBuild\unsigned.apk", "$taskBuild\aligned.apk")
-Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'sign','--ks',$SigningKey,'--ks-key-alias','waterlite','--ks-pass',"file:$PasswordFile",'--out',"$taskBuild\WaterLite-1.1.0.apk", "$taskBuild\aligned.apk")
-Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'verify',"$taskBuild\WaterLite-1.1.0.apk")
+Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'sign','--ks',$SigningKey,'--ks-key-alias','waterlite','--ks-pass',"file:$PasswordFile",'--out',"$taskBuild\WaterLite-1.2.0.apk", "$taskBuild\aligned.apk")
+Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'verify',"$taskBuild\WaterLite-1.2.0.apk")
 if ($Tests) {
     New-Item -ItemType Directory -Force "$taskBuild\test-classes", "$taskBuild\test-dex" | Out-Null
     $taskTests = Get-ChildItem "$taskSource\app\src\androidTest\java" -Recurse -Filter '*.java' | ForEach-Object FullName

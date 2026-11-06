@@ -16,10 +16,20 @@ import com.google.zxing.common.*;
 /** Separate test APK only. It never sends login, SMS or device-control requests to the service. */
 public class RegressionInstrumentation extends Instrumentation {
     private MainActivity activity;
+    private String mode;
+    private MockApi startupMock;
+    @Override public Activity newActivity(ClassLoader loader,String name,Intent intent) throws InstantiationException,IllegalAccessException,ClassNotFoundException { if(startupMock!=null&&name.equals(MainActivity.class.getName())){MainActivity a=new MainActivity();a.api=startupMock;return a;}return super.newActivity(loader,name,intent);}
     private final List<String> passed=new ArrayList<>();
     private void check(boolean condition,String name){if(!condition)throw new AssertionError(name);passed.add(name);}
-    @Override public void onCreate(Bundle b){super.onCreate(b);start();}
+    @Override public void onCreate(Bundle b){super.onCreate(b);mode=b==null?null:b.getString("mode");start();}
     @Override public void onStart(){Bundle result=new Bundle();try{
+        if(mode!=null){
+            Store persisted=new Store(getTargetContext());
+            if(mode.equals("seed")){persisted.login("18800000000","cold-fixture-token");Device d=new Device("12345678","cold fixture");d.running=true;d.ownStart=System.currentTimeMillis()-30000;persisted.devices("18800000000",Collections.singletonList(d));Thread.sleep(200);}
+            else {check(persisted.token().equals("cold-fixture-token"),"Encrypted session survives force-stop and process restart");startupMock=new MockApi();Intent launch=new Intent(getTargetContext(),MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);activity=(MainActivity)startActivitySync(launch);awaitJob();check(!activity.devices.get(0).canEnd()&&!activity.devices.get(0).restored,"Killed process resumes with idle hardware after first fresh status");check(startupMock.statusReads==1,"Cold-start idle recovery does not wait five polling rounds");}
+            result.putString("stream","PASS cold-process "+mode+" "+passed.size()+" checks\n"+String.join("\n",passed));finish(Activity.RESULT_OK,result);return;
+        }
+
         android.accessibilityservice.AccessibilityServiceInfo service=getUiAutomation().getServiceInfo();service.flags|=android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;getUiAutomation().setServiceInfo(service);
         Store store=new Store(getTargetContext());store.logout();store.devices("18800000000",Collections.emptyList());store.hidden("18800000000",Collections.emptySet());
         Intent intent=new Intent(getTargetContext(),MainActivity.class);intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -42,12 +52,14 @@ public class RegressionInstrumentation extends Instrumentation {
         check(store.token().equals("new-fixture-token"),"SMS login UI stores received token");
         check(findText("我的饮水机")!=null && activity.devices.size()==2,"Authenticated device list sync");
         check(mock.correctPlatform,"Control token uses platform 1,1");
+        verify120();
         verifyPalette();
-        final int[] refreshPosition=new int[2],scanPosition=new int[2];runOnMainSync(()->{View icon=activity.findViewById(104);check(icon instanceof ImageButton && "刷新设备".contentEquals(icon.getContentDescription()),"Refresh is an accessible icon button");icon.getLocationOnScreen(refreshPosition);find(activity.getWindow().getDecorView(),"＋  扫码添加",false).getLocationOnScreen(scanPosition);});
-        check(refreshPosition[0]<scanPosition[0] && Math.abs(refreshPosition[1]-scanPosition[1])<4,"Refresh icon is bottom left aligned with scan action");
+        runOnMainSync(()->{int fill=activity.getColor(R.color.water_action_fill);for(int id:new int[]{104,105,106}){View b=activity.findViewById(id);android.graphics.drawable.GradientDrawable shape=(android.graphics.drawable.GradientDrawable)((android.graphics.drawable.RippleDrawable)b.getBackground()).getDrawable(0);check(shape.getColor().getDefaultColor()==fill,"Circular action shares day/night fill "+id);}});
+        final int[] refreshPosition=new int[2],scanPosition=new int[2];runOnMainSync(()->{View icon=activity.findViewById(104);check(icon instanceof Button && "刷新设备".contentEquals(icon.getContentDescription()),"Refresh is an accessible labeled icon button");icon.getLocationOnScreen(refreshPosition);activity.findViewById(105).getLocationOnScreen(scanPosition);});
+        check(Math.abs(refreshPosition[0]-scanPosition[0])<4 && refreshPosition[1]<scanPosition[1] && activity.findViewById(104).getWidth()==activity.findViewById(105).getWidth(),"Refresh is above scan with matching width and right alignment");
         int accountReads=mock.accountReads;runOnMainSync(()->{activity.findViewById(104).performClick();check(booleanField("refreshing")&&!activity.findViewById(104).isEnabled(),"Refresh icon shows an in-progress state");});awaitJob();check(mock.accountReads>accountReads&&!booleanFieldOnMain("refreshing"),"Refresh icon reloads devices and ends progress state");
-        runOnMainSync(()->find(activity.getWindow().getDecorView(),"⋮",false).performClick());waitForIdleSync();check(!accessibleText("刷新设备"),"Refresh entry removed from overflow menu");sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
-        Thread.sleep(250);check(buttonColor("开始出水")==activity.palette.primary,"Start button uses Monet primary color");
+        runOnMainSync(()->activity.findViewById(106).performClick());waitForIdleSync();check(!accessibleText("刷新设备"),"Refresh entry removed from overflow menu");sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+        Thread.sleep(250);check(buttonColor("开始出水")==activity.palette.primary,"Start button uses MIUI primary color");
         mock.lagIdleReads=2;
         runOnMainSync(()->{find(activity.getWindow().getDecorView(),"开始出水",false).performClick();check(find(activity.getWindow().getDecorView(),"停止出水",false)!=null,"Start switches button immediately while request is pending");});awaitJob();
         check(activity.devices.get(0).canEnd() && mock.starts==1 && findText("停止出水")!=null,"One tap starts water and changes button without confirmation");
@@ -61,7 +73,7 @@ public class RegressionInstrumentation extends Instrumentation {
         runOnMainSync(()->find(activity.getWindow().getDecorView(),"停止出水",false).performClick());awaitJob();check(!activity.devices.get(0).canEnd() && mock.ends==1 && findText("开始出水")!=null,"One tap sends real end endpoint even while status request is pending");
         mock.statusGate.countDown();awaitCondition(()->!booleanField("polling"),3000);mock.statusGate=null;
         check(!activity.devices.get(0).canEnd(),"Older running response cannot undo successful stop");
-        Thread.sleep(250);check(buttonColor("开始出水")==activity.palette.primary,"Stopped button transitions back to Monet primary");
+        Thread.sleep(250);check(buttonColor("开始出水")==activity.palette.primary,"Stopped button transitions back to MIUI primary");
         runOnMainSync(()->find(activity.getWindow().getDecorView(),"开始出水",false).performClick());awaitJob();mock.machineStatus=99;
         awaitCondition(()->!activity.devices.get(0).canEnd(),12000);awaitJob();
         check(findText("开始出水")!=null && mock.ends==2,"Automatic hardware stop restores start and closes session without refresh");
@@ -115,6 +127,29 @@ public class RegressionInstrumentation extends Instrumentation {
         runOnMainSync(()->find(activity.getWindow().getDecorView(),"删除",false).performClick());waitForIdleSync();clickDialog("删除");waitForIdleSync();check(activity.devices.size()==1 && store.hidden("18800000000").contains("12345678"),"Confirmed delete removes and persistently hides device");
         result.putString("stream","PASS "+passed.size()+" checks\n"+String.join("\n",passed));finish(Activity.RESULT_OK,result);
     }catch(Throwable e){java.io.StringWriter trace=new java.io.StringWriter();e.printStackTrace(new java.io.PrintWriter(trace));try{screenshot("qa-failure.png");}catch(Exception ignored){}result.putString("stream","FAILED: "+trace+"\nPassed: "+passed);finish(Activity.RESULT_CANCELED,result);}}
+    private void verify120() throws Exception {
+        check(IlifeApi.loginSignature("18800000000","123456","test-salt").equals("e8a2f17a234e8915c3d631c919e52225"),"App login signature matches protocol vector");
+        java.lang.reflect.Method connection=IlifeApi.class.getDeclaredMethod("connection",String.class);connection.setAccessible(true);
+        java.net.HttpURLConnection c=(java.net.HttpURLConnection)connection.invoke(new IlifeApi(),"https://example.com");
+        check("3.1.9".equals(c.getRequestProperty("VersionCode"))&&"Android_ilife798_3.1.9".equals(c.getRequestProperty("User-Agent")),"Current device protocol headers");c.disconnect();
+        Device stale=new Device("12345678","fixture");stale.running=true;stale.ownStart=System.currentTimeMillis()-30000;
+        Device restored=Device.from(stale.json());check(restored.canEnd()&&restored.restored,"Cold process restores a stop-capable hint rather than confirmed running state");
+        restored.acceptStatus(99);check(!restored.canEnd()&&restored.ownStart==0&&!restored.restored,"First fresh idle response clears stale cold-start state");
+        restored=Device.from(stale.json());restored.acceptStatus(0);check(restored.canEnd()&&!restored.restored,"Cold-start running hardware stays stoppable");
+        stale.ownStart=System.currentTimeMillis();restored=Device.from(stale.json());restored.acceptStatus(99);check(restored.canEnd(),"Cold-start preserves short startup status-lag protection");
+        final Device cached=Device.from(new JSONObject().put("id","12345678").put("name","宿舍楼 · 一层").put("running",true).put("ownStart",System.currentTimeMillis()-30000));
+        runOnMainSync(()->{activity.devices.set(0,cached);activity.showDevices();activity.refresh();});awaitJob();check(!activity.devices.get(0).running,"Refresh copy preserves cold-start reconciliation flag");
+        JSONObject release=new JSONObject().put("tag_name","v1.3.0").put("body","fixture release notes").put("assets",new JSONArray().put(new JSONObject().put("name","WaterLite-1.3.0.apk").put("size",100).put("browser_download_url",UpdateClient.PROJECT+"/releases/download/v1.3.0/WaterLite-1.3.0.apk")));
+        UpdateClient.Release update=UpdateClient.parse(release);check(update!=null&&update.newerThan("1.2.0"),"Update parser accepts newer stable release with APK");
+        check(!update.newerThan("1.3.0")&&!update.newerThan("2.0.0"),"Update comparison rejects same and older releases");
+        check(new UpdateClient.Release("v1.10.0","").newerThan("1.9.9"),"Update compares numeric versions rather than text");
+        release.put("prerelease",true);check(UpdateClient.parse(release)==null,"Update ignores prereleases");release.put("prerelease",false).put("draft",true);check(UpdateClient.parse(release)==null,"Update ignores drafts");
+        release.put("draft",false).put("tag_name","v1.3.0-beta");check(UpdateClient.parse(release)==null,"Update rejects invalid stable version tags");
+        release.put("tag_name","v1.3.0").put("assets",new JSONArray());check(UpdateClient.parse(release)==null,"Update ignores releases without an APK");
+        runOnMainSync(()->{try{Field pending=MainActivity.class.getDeclaredField("pendingUpdate");pending.setAccessible(true);pending.set(activity,update);Method show=MainActivity.class.getDeclaredMethod("showUpdate");show.setAccessible(true);show.invoke(activity);}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        awaitCondition(()->accessibleText("发现新版本 v1.3.0"),4000);Thread.sleep(450);waitForIdleSync();screenshot("qa-update.png");check(accessibleText("发现新版本 v1.3.0")&&accessibleText("fixture release notes")&&accessibleText("GitHub")&&accessibleText("取消"),"Update dialog displays version notes Cancel and GitHub");clickDialog("取消");waitForIdleSync();
+        check(update.url.equals(UpdateClient.PROJECT+"/releases/tag/v1.3.0"),"Update link stays on the intended GitHub project release");
+    }
     private void verifyPalette(){
         AppPalette palette=activity.palette;
         check(contrast(palette.text,palette.background)>=4.5,"Page text meets WCAG contrast");
@@ -123,8 +158,8 @@ public class RegressionInstrumentation extends Instrumentation {
         check(contrast(palette.onPrimary,palette.primary)>=4.5,"Primary button text meets WCAG contrast");
         check(contrast(palette.onError,palette.error)>=4.5,"Stop button text meets WCAG contrast");
         check(contrast(palette.onPrimaryContainer,palette.primaryContainer)>=4.5,"Tonal action text meets WCAG contrast");
-        if(Build.VERSION.SDK_INT>=31){boolean dark=(activity.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;check(palette.primary==activity.getColor(dark?android.R.color.system_accent1_200:android.R.color.system_accent1_600),"Monet primary comes from Android wallpaper palette");}
-        runOnMainSync(()->{android.util.TypedValue accent=new android.util.TypedValue();check(activity.getTheme().resolveAttribute(android.R.attr.colorAccent,accent,true)&&accent.data==palette.primary,"Native controls and dialogs share Monet accent");});
+        if(Build.VERSION.SDK_INT>=31){boolean dark=(activity.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES;check(palette.primary==android.graphics.Color.parseColor(dark?"#80B4FF":"#0065EB"),"MIUI primary is fixed and independent of wallpaper");}
+        runOnMainSync(()->{android.util.TypedValue accent=new android.util.TypedValue();check(activity.getTheme().resolveAttribute(android.R.attr.colorAccent,accent,true)&&accent.data==palette.primary,"Native controls and dialogs share MIUI accent");});
     }
     private static double contrast(int foreground,int background){double a=android.graphics.Color.luminance(foreground),b=android.graphics.Color.luminance(background);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);}
     private void verifyDisabledAnimations() throws Exception {
@@ -186,7 +221,7 @@ public class RegressionInstrumentation extends Instrumentation {
                 response.put("data",new JSONObject().put("device",new JSONObject().put("name","fixture device").put("gene",new JSONObject().put("status",state))));
             }
             else if(path.equals("/acc/wallet/owner"))response.put("data",new JSONObject().put("aw",new JSONObject().put("ep",new JSONObject().put("id","test").put("name","测试钱包")).put("total",12.34)));
-            else if(path.equals("/acc/login"))response.put("data",new JSONObject().put("al",new JSONObject().put("token","new-fixture-token")));
+            else if(path.startsWith("/acc/login?sign="))response.put("data",new JSONObject().put("al",new JSONObject().put("token","new-fixture-token")));
             else if(path.startsWith("/dev/start")){starts++;response.put("code",startCode);if(startCode==0)machineStatus=0;}
             else if(path.startsWith("/dev/end")){ends++;response.put("code",stopCode);if(stopCode==0)machineStatus=99;}
             return new Result(response);

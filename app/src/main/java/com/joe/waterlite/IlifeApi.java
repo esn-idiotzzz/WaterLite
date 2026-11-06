@@ -39,7 +39,7 @@ class IlifeApi {
     private HttpURLConnection connection(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(15000); c.setReadTimeout(20000); c.setInstanceFollowRedirects(false);
-        c.setRequestProperty("User-Agent", "Android_ilife798_8.2.9"); c.setRequestProperty("VersionCode", "8.2.9");
+        c.setRequestProperty("User-Agent", "Android_ilife798_3.1.9"); c.setRequestProperty("VersionCode", "3.1.9");
         c.setRequestProperty("Accept-Language", "zh-Hans-CN;q=1"); return c;
     }
     Result request(String method, String path, JSONObject body, String token, String appType) throws Exception {
@@ -63,12 +63,17 @@ class IlifeApi {
         HttpURLConnection c=connection(BASE+"/captcha/?s="+enc(key)+"&r="+System.currentTimeMillis());
         try { if(c.getResponseCode()!=200)throw new IOException("图形验证码加载失败，点击重试"); try(InputStream in=c.getInputStream()){ Bitmap b=BitmapFactory.decodeStream(in); if(b==null)throw new IOException("图形验证码加载失败，点击重试"); return b; } } finally {c.disconnect();}
     }
-    Result sms(String phone,String captcha,String key) throws Exception { return request("POST","/acc/login/code",new JSONObject().put("un",phone).put("authCode",captcha).put("s",key),"","1,5"); }
-    Result login(String phone,String sms) throws Exception { return request("POST","/acc/login",new JSONObject().put("openCode","").put("un",phone).put("authCode",sms).put("cid",""),"","1,1"); }
+    Result sms(String phone,String captcha,String key) throws Exception { return request("POST","/acc/login/code",new JSONObject().put("un",phone).put("authCode",captcha).put("s",key),"","1,1"); }
+    static String loginSignature(String phone,String sms,String salt) throws Exception {
+        if(salt.isEmpty())throw new IllegalStateException("构建未配置设备登录签名参数");
+        byte[] hash=java.security.MessageDigest.getInstance("MD5").digest(("authCode="+sms+"&un="+phone+salt).getBytes("UTF-8"));
+        StringBuilder out=new StringBuilder();for(byte b:hash)out.append(String.format(java.util.Locale.ROOT,"%02x",b&255));return out.toString();
+    }
+    Result login(String phone,String sms) throws Exception { return request("POST","/acc/login?sign="+loginSignature(phone,sms,BuildConfig.APP_LOGIN_SALT),new JSONObject().put("un",phone).put("authCode",sms),"","1,1"); }
     Result account(String token) throws Exception { return request("GET","/acc/view-info",null,token,"1,1"); }
     Result devices(String token) throws Exception { return request("GET","/ui/app/master",null,token,"1,1"); }
     Result wallet(String token) throws Exception { return request("GET","/acc/wallet/owner",null,token,"1,1"); }
     Result status(String token,String id) throws Exception { return request("GET","/ui/app/dev/status?did="+enc(id)+"&more=true&promo=false",null,token,"1,1"); }
-    Result control(String token,String id,boolean start) throws Exception { return request("GET",start?"/dev/start?did="+enc(id)+"&upgrade=true&ptype=91&rcp=false":"/dev/end?did="+enc(id),null,token,"1,1"); }
+    Result control(String token,String id,boolean start) throws Exception { return request("GET",start?"/dev/start?did="+enc(id)+"&upgrade=true&ptype=91&rcp=false":"/dev/end?did="+enc(id)+"&rcp=false",null,token,"1,1"); }
     static int statusValue(Result r) throws Exception { r.require(); JSONObject device=r.data().optJSONObject("device"); JSONObject gene=device==null?null:device.optJSONObject("gene"); if(gene==null || !gene.has("status"))throw new Exception("没有取得设备状态，请稍后刷新"); return gene.getInt("status"); }
 }

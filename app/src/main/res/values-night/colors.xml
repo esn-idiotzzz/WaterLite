@@ -1,16 +1,18 @@
 <resources>
-    <color name="water_background">#111318</color>
-    <color name="water_surface">#1C1F26</color>
-    <color name="water_surface_variant">#44474F</color>
-    <color name="water_text">#E2E2E9</color>
-    <color name="water_text_secondary">#C4C6D0</color>
-    <color name="water_outline">#8E9099</color>
-    <color name="water_primary">#ACC7FF</color>
-    <color name="water_on_primary">#002F64</color>
-    <color name="water_primary_container">#13447B</color>
-    <color name="water_on_primary_container">#D8E2FF</color>
+    <color name="water_background">#101010</color>
+    <color name="water_surface">#202020</color>
+    <color name="water_surface_variant">#383838</color>
+    <color name="water_text">#F2F2F2</color>
+    <color name="water_text_secondary">#BBBBBB</color>
+    <color name="water_outline">#888888</color>
+    <color name="water_primary">#80B4FF</color>
+    <color name="water_on_primary">#002D65</color>
+    <color name="water_primary_container">#17365D</color>
+    <color name="water_on_primary_container">#D6E7FF</color>
     <color name="water_error">#FFB4AB</color>
     <color name="water_on_error">#690005</color>
-    <color name="water_control_highlight">#33ACC7FF</color>
+    <color name="water_control_highlight">#3380B4FF</color>
     <bool name="water_light_system_bars">false</bool>
+    <color name="water_action_fill">#173D70</color>
+    <color name="water_action_icon">#FFFFFF</color>
 </resources>

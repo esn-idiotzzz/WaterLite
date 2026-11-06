@@ -1,8 +1,13 @@
 plugins { id 'com.android.application' }
+def protocol = new Properties()
+def protocolFile = rootProject.file('secrets.properties')
+if (protocolFile.exists()) protocolFile.withInputStream { protocol.load(it) }
 android {
+    buildFeatures { buildConfig true }
+
     namespace 'com.joe.waterlite'
     compileSdk 35
-    defaultConfig { applicationId 'com.joe.waterlite'; minSdk 26; targetSdk 35; versionCode 4; versionName '1.1.0'; testInstrumentationRunner 'com.joe.waterlite.RegressionInstrumentation' }
+    defaultConfig { buildConfigField 'String', 'APP_LOGIN_SALT', '"' + protocol.getProperty('APP_LOGIN_SALT', '').replace('\\','\\\\').replace('"','\\"') + '"'; applicationId 'com.joe.waterlite'; minSdk 26; targetSdk 35; versionCode 5; versionName '1.2.0'; testInstrumentationRunner 'com.joe.waterlite.RegressionInstrumentation' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
     buildTypes { release { minifyEnabled false } }
 }

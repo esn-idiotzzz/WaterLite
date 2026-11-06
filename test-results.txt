@@ -1,10 +1,9 @@
-WaterLite 1.1.0 / versionCode 4
-MuMu Android 12L API 32; mocked service responses; no real SMS or dispenser commands.
-Default palette light primary: #2E6195. Alternate system palette seed: 746BC1; light primary: #5D5698.
-All three runs used the same signed release APK.
+WaterLite 1.2.0 / versionCode 5
+Android 12L API32, mocked service; no real SMS or dispenser commands.
+Same final signed APK used for dark/light/full regression and force-stop process restoration.
 
 [dark]
-PASS 69 checks
+PASS 88 checks
 No session opens login screen
 Keystore encryption round trip
 Token is not stored in plaintext
@@ -17,20 +16,39 @@ QR decoder synthetic camera frame
 SMS login UI stores received token
 Authenticated device list sync
 Control token uses platform 1,1
+App login signature matches protocol vector
+Current device protocol headers
+Cold process restores a stop-capable hint rather than confirmed running state
+First fresh idle response clears stale cold-start state
+Cold-start running hardware stays stoppable
+Cold-start preserves short startup status-lag protection
+Refresh copy preserves cold-start reconciliation flag
+Update parser accepts newer stable release with APK
+Update comparison rejects same and older releases
+Update compares numeric versions rather than text
+Update ignores prereleases
+Update ignores drafts
+Update rejects invalid stable version tags
+Update ignores releases without an APK
+Update dialog displays version notes Cancel and GitHub
+Update link stays on the intended GitHub project release
 Page text meets WCAG contrast
 Card text meets WCAG contrast
 Secondary text meets WCAG contrast
 Primary button text meets WCAG contrast
 Stop button text meets WCAG contrast
 Tonal action text meets WCAG contrast
-Monet primary comes from Android wallpaper palette
-Native controls and dialogs share Monet accent
-Refresh is an accessible icon button
-Refresh icon is bottom left aligned with scan action
+MIUI primary is fixed and independent of wallpaper
+Native controls and dialogs share MIUI accent
+Circular action shares day/night fill 104
+Circular action shares day/night fill 105
+Circular action shares day/night fill 106
+Refresh is an accessible labeled icon button
+Refresh is above scan with matching width and right alignment
 Refresh icon shows an in-progress state
 Refresh icon reloads devices and ends progress state
 Refresh entry removed from overflow menu
-Start button uses Monet primary color
+Start button uses MIUI primary color
 Start switches button immediately while request is pending
 One tap starts water and changes button without confirmation
 First delayed idle response does not hide stop button
@@ -39,7 +57,7 @@ Repeated startup status lag is tolerated
 Automatic status check starts without manual refresh
 One tap sends real end endpoint even while status request is pending
 Older running response cannot undo successful stop
-Stopped button transitions back to Monet primary
+Stopped button transitions back to MIUI primary
 Automatic hardware stop restores start and closes session without refresh
 Running device detected automatically without a local start marker
 Detected running device can be stopped with same end endpoint
@@ -76,7 +94,7 @@ Swipe pin action toggles pin
 Confirmed delete removes and persistently hides device
 
 [light]
-PASS 69 checks
+PASS 88 checks
 No session opens login screen
 Keystore encryption round trip
 Token is not stored in plaintext
@@ -89,20 +107,39 @@ QR decoder synthetic camera frame
 SMS login UI stores received token
 Authenticated device list sync
 Control token uses platform 1,1
+App login signature matches protocol vector
+Current device protocol headers
+Cold process restores a stop-capable hint rather than confirmed running state
+First fresh idle response clears stale cold-start state
+Cold-start running hardware stays stoppable
+Cold-start preserves short startup status-lag protection
+Refresh copy preserves cold-start reconciliation flag
+Update parser accepts newer stable release with APK
+Update comparison rejects same and older releases
+Update compares numeric versions rather than text
+Update ignores prereleases
+Update ignores drafts
+Update rejects invalid stable version tags
+Update ignores releases without an APK
+Update dialog displays version notes Cancel and GitHub
+Update link stays on the intended GitHub project release
 Page text meets WCAG contrast
 Card text meets WCAG contrast
 Secondary text meets WCAG contrast
 Primary button text meets WCAG contrast
 Stop button text meets WCAG contrast
 Tonal action text meets WCAG contrast
-Monet primary comes from Android wallpaper palette
-Native controls and dialogs share Monet accent
-Refresh is an accessible icon button
-Refresh icon is bottom left aligned with scan action
+MIUI primary is fixed and independent of wallpaper
+Native controls and dialogs share MIUI accent
+Circular action shares day/night fill 104
+Circular action shares day/night fill 105
+Circular action shares day/night fill 106
+Refresh is an accessible labeled icon button
+Refresh is above scan with matching width and right alignment
 Refresh icon shows an in-progress state
 Refresh icon reloads devices and ends progress state
 Refresh entry removed from overflow menu
-Start button uses Monet primary color
+Start button uses MIUI primary color
 Start switches button immediately while request is pending
 One tap starts water and changes button without confirmation
 First delayed idle response does not hide stop button
@@ -111,7 +148,7 @@ Repeated startup status lag is tolerated
 Automatic status check starts without manual refresh
 One tap sends real end endpoint even while status request is pending
 Older running response cannot undo successful stop
-Stopped button transitions back to Monet primary
+Stopped button transitions back to MIUI primary
 Automatic hardware stop restores start and closes session without refresh
 Running device detected automatically without a local start marker
 Detected running device can be stopped with same end endpoint
@@ -147,75 +184,9 @@ Left swipe smoothly reveals device actions
 Swipe pin action toggles pin
 Confirmed delete removes and persistently hides device
 
-[purple]
-PASS 69 checks
-No session opens login screen
-Keystore encryption round trip
-Token is not stored in plaintext
-QR query DID parser
-QR JSON DID parser
-QR supported path parser
-Unrelated QR rejected
-Malformed DID rejected
-QR decoder synthetic camera frame
-SMS login UI stores received token
-Authenticated device list sync
-Control token uses platform 1,1
-Page text meets WCAG contrast
-Card text meets WCAG contrast
-Secondary text meets WCAG contrast
-Primary button text meets WCAG contrast
-Stop button text meets WCAG contrast
-Tonal action text meets WCAG contrast
-Monet primary comes from Android wallpaper palette
-Native controls and dialogs share Monet accent
-Refresh is an accessible icon button
-Refresh icon is bottom left aligned with scan action
-Refresh icon shows an in-progress state
-Refresh icon reloads devices and ends progress state
-Refresh entry removed from overflow menu
-Start button uses Monet primary color
-Start switches button immediately while request is pending
-One tap starts water and changes button without confirmation
-First delayed idle response does not hide stop button
-Stop button transitions to theme error color
-Repeated startup status lag is tolerated
-Automatic status check starts without manual refresh
-One tap sends real end endpoint even while status request is pending
-Older running response cannot undo successful stop
-Stopped button transitions back to Monet primary
-Automatic hardware stop restores start and closes session without refresh
-Running device detected automatically without a local start marker
-Detected running device can be stopped with same end endpoint
-Rejected start restores start button
-Rejected stop remains stoppable instead of claiming idle
-Temporary polling failure preserves stop button
-Returning from background reconciles stopped hardware in one fresh check
-Still-running hardware remains stoppable on resume
-Slow status request is active before backgrounding
-Previous background request cannot delay fresh resume status
-Quick background return preserves startup idle protection
-Resume network failure never pretends hardware stopped
-Failed resume check retries and recovers without five extra rounds
-Wallet amount parsed
-Temporary API error keeps encrypted session and list
-Network failure keeps session
-Only explicit expiry requests reauthentication
-Devices survive expiry
-New login clears expiry flag
-Pin persists across store recreation
-Deleted remote favorite does not return after sync
-Device data isolated by phone account
-Disabled animations immediately show the correct running control
-Disabled animations immediately restore the idle control
-Disabled animations never start an infinite refresh spinner
-Refresh completes and restores icon with animations disabled
-Large device list scrolls with at least fourteen devices
-Refresh retains the device scroll container and position
-Unchanged refresh retains control button identity
-Retained row pin action updates the current refreshed device
-Pinning retains the device scroll container and position
-Left swipe smoothly reveals device actions
-Swipe pin action toggles pin
-Confirmed delete removes and persistently hides device
+[cold]
+PASS cold-process cold 3 checks
+Encrypted session survives force-stop and process restart
+Killed process resumes with idle hardware after first fresh status
+Cold-start idle recovery does not wait five polling rounds
 

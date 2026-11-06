@@ -30,7 +30,7 @@ public class MainActivity extends Activity {
     private int generation, captchaGeneration;
     private boolean busy, foreground, loginPage;
     private boolean polling;
-    private boolean resumeSync;
+    private boolean resumeSync=true;
     private volatile int statusGeneration;
     private volatile Thread pollingThread;
     private Future<?> pollFuture;
@@ -47,9 +47,25 @@ public class MainActivity extends Activity {
     private View emptyDevices,deviceHint;
     private TextView accountLabel;
     private int renderVersion;
-    private ImageButton refreshButton;
+    private Button refreshButton;
+    private RotateDrawable refreshGlyph;
     private ObjectAnimator refreshAnimation;
     private boolean refreshing;
+    private final ExecutorService updateWorker=Executors.newSingleThreadExecutor();
+    private boolean checkingUpdate;
+    private UpdateClient.Release pendingUpdate;
+    private AlertDialog updateDialog;
+    private void checkUpdate(){
+        if(checkingUpdate)return;checkingUpdate=true;
+        updateWorker.execute(()->{UpdateClient.Release found=null;try{found=new UpdateClient().latest();}catch(Exception ignored){}final UpdateClient.Release release=found;handler.post(()->{checkingUpdate=false;if(isDestroyed())return;if(release!=null&&release.newerThan("1.2.0"))pendingUpdate=release;showUpdate();});});
+    }
+    private void showUpdate(){
+        if(!foreground||busy||pendingUpdate==null||updateDialog!=null||pendingAddDialog!=null)return;
+        final UpdateClient.Release release=pendingUpdate;pendingUpdate=null;
+        ScrollView scroll=new ScrollView(this);TextView notes=text(release.notes.isEmpty()?"此版本未提供更新说明。":release.notes,16,ink);notes.setPadding(dp(24),dp(12),dp(24),dp(12));scroll.addView(notes);
+        updateDialog=new AlertDialog.Builder(this).setTitle("发现新版本 "+release.version).setView(scroll).setNegativeButton("取消",null).setPositiveButton("GitHub",(a,w)->{try{startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(release.url)));}catch(ActivityNotFoundException e){Toast.makeText(this,"未找到浏览器，请打开 GitHub 项目下载",Toast.LENGTH_LONG).show();}}).create();
+        updateDialog.setOnDismissListener(d->updateDialog=null);updateDialog.show();updateDialog.getButton(AlertDialog.BUTTON_POSITIVE).setAllCaps(false);
+    }
     private int bg, card, ink, muted, accent, tint, danger;
     private FrameLayout root;
     private TextView notice;
@@ -62,7 +78,7 @@ public class MainActivity extends Activity {
     private AlertDialog pendingAddDialog;
     private final Runnable ticker=new Runnable(){ public void run(){
         if(!foreground)return;
-        updateCooldown();
+        updateCooldown();showUpdate();
         if(!loginPage && !busy && !polling && !devices.isEmpty() && SystemClock.elapsedRealtime()-lastPoll>=(hasActive()?1500:8000)) { lastPoll=SystemClock.elapsedRealtime(); pollDevices(); }
         handler.postDelayed(this,500);
     }};
@@ -80,9 +96,9 @@ public class MainActivity extends Activity {
         if(state!=null && loginPage){phoneInput.setText(state.getString("inputPhone",phone));smsInput.setText(state.getString("inputSms",""));}
     }
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);if(loginPage){state.putString("inputPhone",phoneInput.getText().toString());state.putString("inputSms",smsInput.getText().toString());}}
-    @Override protected void onResume(){super.onResume();foreground=true;lastPoll=0;updateRefreshButton();handler.removeCallbacks(ticker);handler.post(ticker);}
+    @Override protected void onResume(){super.onResume();foreground=true;checkUpdate();lastPoll=0;updateRefreshButton();handler.removeCallbacks(ticker);handler.post(ticker);}
     @Override protected void onPause(){foreground=false;resumeSync=true;statusGeneration++;if(pollFuture!=null)pollFuture.cancel(true);api.cancelStatusRequests(pollingThread);polling=false;handler.removeCallbacks(ticker);cancelControlAnimations();updateDeviceViews();updateRefreshButton();for(Button b:controlButtons.values()){b.animate().cancel();b.setScaleX(1);b.setScaleY(1);}for(SwipeRow row:deviceRows.values())row.finishMotion();super.onPause();}
-    @Override protected void onDestroy(){generation++;captchaGeneration++;worker.shutdownNow();statusWorker.shutdownNow();handler.removeCallbacksAndMessages(null);cancelControlAnimations();if(refreshAnimation!=null)refreshAnimation.cancel();super.onDestroy();}
+    @Override protected void onDestroy(){generation++;captchaGeneration++;worker.shutdownNow();statusWorker.shutdownNow();updateWorker.shutdownNow();if(updateDialog!=null)updateDialog.dismiss();handler.removeCallbacksAndMessages(null);cancelControlAnimations();if(refreshAnimation!=null)refreshAnimation.cancel();super.onDestroy();}
     int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
     private TextView text(String s,int size,int color){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);v.setFontFeatureSettings("kern");return v;}
     private LinearLayout column(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
@@ -114,10 +130,17 @@ public class MainActivity extends Activity {
         Button b=button(label,false,click);b.setTextSize(12);b.setTextColor(color);b.setPadding(dp(4),0,dp(4),0);b.setGravity(Gravity.CENTER);b.setStateListAnimator(null);
         android.graphics.drawable.Drawable glyph=getDrawable(icon).mutate();glyph.setTint(color);b.setCompoundDrawablesWithIntrinsicBounds(null,glyph,null,null);b.setCompoundDrawablePadding(dp(8));b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(color,28)),shape(Color.TRANSPARENT,16),null));return b;
     }
+    private Button labeledAction(int icon,String label,int id,View.OnClickListener click){
+        int fill=getColor(R.color.water_action_fill),glyph=getColor(R.color.water_action_icon);Button b=button(label,false,click);b.setId(id);b.setContentDescription(label);b.setTextColor(glyph);b.setCompoundDrawablePadding(dp(8));Drawable d=getDrawable(icon).mutate();d.setTint(glyph);d.setBounds(0,0,dp(20),dp(20));b.setCompoundDrawablesRelative(d,null,null,null);b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(glyph,28)),shape(fill,28),null));b.setElevation(dp(1));return b;
+    }
+    private ImageButton actionButton(int icon,String label,int id,View.OnClickListener click){
+        int fill=getColor(R.color.water_action_fill),glyph=getColor(R.color.water_action_icon);
+        ImageButton b=new ImageButton(this);b.setId(id);b.setContentDescription(label);b.setTooltipText(label);b.setImageResource(icon);b.setImageTintList(ColorStateList.valueOf(glyph));b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);b.setPadding(dp(12),dp(12),dp(12),dp(12));b.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(glyph,28)),shape(fill,28),null));b.setElevation(dp(1));b.setOnClickListener(click);return b;
+    }
     private void updateRefreshButton(){
         if(refreshButton==null)return;refreshButton.setEnabled(!busy);
-        if(refreshing && animateMotion() && (refreshAnimation==null || !refreshAnimation.isRunning())){refreshAnimation=ObjectAnimator.ofFloat(refreshButton,"rotation",0,360);refreshAnimation.setDuration(900);refreshAnimation.setRepeatCount(ValueAnimator.INFINITE);refreshAnimation.setInterpolator(new LinearInterpolator());refreshAnimation.start();}
-        else if((!refreshing||!animateMotion()) && refreshAnimation!=null){refreshAnimation.cancel();refreshAnimation=null;refreshButton.setRotation(0);}
+        if(refreshing && animateMotion() && (refreshAnimation==null || !refreshAnimation.isRunning())){refreshAnimation=ObjectAnimator.ofInt(refreshGlyph,"level",0,10000);refreshAnimation.setDuration(900);refreshAnimation.setRepeatCount(ValueAnimator.INFINITE);refreshAnimation.setInterpolator(new LinearInterpolator());refreshAnimation.start();}
+        else if((!refreshing||!animateMotion()) && refreshAnimation!=null){refreshAnimation.cancel();refreshAnimation=null;refreshGlyph.setLevel(0);}
     }
     private void gap(LinearLayout l,int h){Space v=new Space(this);l.addView(v,new LinearLayout.LayoutParams(1,dp(h)));}
     private void mount(){
@@ -179,8 +202,8 @@ public class MainActivity extends Activity {
         deviceRows.clear();controlButtons.clear();statusLabels.clear();
         loginPage=false;captchaGeneration++;mount();LinearLayout page=column();root.addView(page,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout bar=horizontal();bar.setPadding(dp(24),dp(8),dp(12),dp(8));TextView app=text("轻饮水",17,accent);app.setTypeface(null,Typeface.BOLD);bar.addView(app,new LinearLayout.LayoutParams(0,dp(48),1));app.setGravity(Gravity.CENTER_VERTICAL);
-        Button menu=button("⋮",false,v->menu(v));menu.setContentDescription("更多选项");bar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(48)));page.addView(bar);
-        deviceScroll=new ScrollView(this);deviceScroll.setClipToPadding(false);page.addView(deviceScroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=column();body.setPadding(dp(24),dp(20),dp(24),dp(112));deviceScroll.addView(body);
+        ImageButton menu=actionButton(R.drawable.ic_more,"更多选项",106,v->menu(v));bar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(48)));page.addView(bar);
+        deviceScroll=new ScrollView(this);deviceScroll.setClipToPadding(false);page.addView(deviceScroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=column();body.setPadding(dp(24),dp(20),dp(24),dp(188));deviceScroll.addView(body);
         TextView title=text("我的饮水机",30,ink);title.setTypeface(null,Typeface.BOLD);body.addView(title);gap(body,10);
         accountLabel=text("",14,muted);body.addView(accountLabel);gap(body,20);
         notice=text(message,14,muted);notice.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(notice);gap(body,12);
@@ -188,10 +211,10 @@ public class MainActivity extends Activity {
         TextView drop=text("◉",48,accent);empty.addView(drop);gap(empty,20);empty.addView(text("还没有饮水机",21,ink));gap(empty,10);TextView help=text("扫描机身二维码，添加常用设备。\n账号收藏也会在刷新后显示。",15,muted);help.setGravity(Gravity.CENTER);empty.addView(help);body.addView(empty);emptyDevices=empty;
         TextView hint=text("左划设备可置顶或删除",12,muted);hint.setPadding(0,0,0,dp(12));body.addView(hint);deviceHint=hint;
         deviceList=column();body.addView(deviceList);
-        Button add=button("＋  扫码添加",true,v->{if(!busy)startActivityForResult(new Intent(this,ScanActivity.class),200);});add.setEnabled(!busy);
-        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(-2,dp(56),Gravity.BOTTOM|Gravity.END);fp.setMargins(dp(24),0,dp(24),dp(24));root.addView(add,fp);
-        refreshButton=new ImageButton(this);refreshButton.setId(104);refreshButton.setContentDescription("刷新设备");refreshButton.setImageResource(com.joe.waterlite.R.drawable.ic_refresh);refreshButton.setImageTintList(ColorStateList.valueOf(palette.onPrimaryContainer));refreshButton.setPadding(dp(16),dp(16),dp(16),dp(16));refreshButton.setBackground(new RippleDrawable(ColorStateList.valueOf(alpha(palette.onPrimaryContainer,28)),shape(tint,28),null));refreshButton.setElevation(dp(2));refreshButton.setOnClickListener(v->refresh());
-        FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(56),dp(56),Gravity.BOTTOM|Gravity.START);rp.setMargins(dp(24),0,dp(24),dp(24));root.addView(refreshButton,rp);renderDevices();
+        Button add=labeledAction(R.drawable.ic_scan,"扫码添加",105,v->{if(!busy)startActivityForResult(new Intent(this,ScanActivity.class),200);});add.setEnabled(!busy);
+        FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(132),dp(56),Gravity.BOTTOM|Gravity.END);fp.setMargins(dp(24),0,dp(24),dp(24));root.addView(add,fp);
+        refreshButton=labeledAction(R.drawable.ic_refresh,"刷新",104,v->refresh());refreshButton.setContentDescription("刷新设备");refreshGlyph=new RotateDrawable();refreshGlyph.setDrawable(getDrawable(R.drawable.ic_refresh));refreshGlyph.setFromDegrees(0);refreshGlyph.setToDegrees(360);refreshGlyph.setBounds(0,0,dp(20),dp(20));refreshGlyph.setTint(getColor(R.color.water_action_icon));refreshButton.setCompoundDrawablesRelative(refreshGlyph,null,null,null);
+        FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(132),dp(56),Gravity.BOTTOM|Gravity.END);rp.setMargins(dp(24),0,dp(24),dp(96));root.addView(refreshButton,rp);renderDevices();
     }
     private void renderDevices(){
         setText(accountLabel,maskPhone(phone)+(wallet.isEmpty()?"":"  ·  "+wallet));setText(notice,message);
@@ -218,14 +241,14 @@ public class MainActivity extends Activity {
         TextView sub=text(deviceState(d)+"  ·  "+d.id,13,muted);statusLabels.put(d.id,sub);content.addView(sub);content.setOnLongClickListener(v->{if(busy)return true;new AlertDialog.Builder(this).setTitle(row.device.name).setItems(new String[]{row.device.pinned?"取消置顶":"置顶","修改名称","删除"},(a,n)->{if(busy)return;Device current=row.device;if(n==0){row.finishMotion();row.position(0);current.pinned=!current.pinned;save();showDevices();}else if(n==1)rename(current);else remove(current);}).show();return true;});
         row.addView(content,new FrameLayout.LayoutParams(-1,-2));row.front=content;return row;
     }
-    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.1.0").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
+    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.2.0").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
     private void logout(){if(hasActive()){setMessage("请先结束正在进行的接水。",true);return;}new AlertDialog.Builder(this).setTitle("退出登录？").setMessage("已添加的饮水机和置顶设置会保留。").setNegativeButton("取消",null).setPositiveButton("退出",(a,w)->{generation++;store.logout();token="";message="";showLogin();}).show();}
     private void remove(Device d){if(busy)return;if(d.canEnd()){setMessage("请先停止这台设备的出水。",true);return;}new AlertDialog.Builder(this).setTitle("删除「"+d.name+"」？").setMessage("移除本应用快捷入口，之后可重新扫码添加。").setNegativeButton("取消",null).setPositiveButton("删除",(a,w)->{try{Set<String> ids=store.hidden(phone);ids.add(d.id);store.hidden(phone,ids);devices.remove(d);store.devices(phone,devices);showDevices();}catch(Exception e){setMessage(safeError(e),true);}}).show();}
     private void rename(Device d){EditText input=field("设备名称",InputType.TYPE_CLASS_TEXT);input.setText(d.name);new AlertDialog.Builder(this).setTitle("修改名称").setView(input).setNegativeButton("取消",null).setPositiveButton("保存",(a,w)->{String name=input.getText().toString().trim();if(!name.isEmpty()){d.name=name;save();showDevices();}}).show();}
     private void save(){try{store.devices(phone,devices);}catch(Exception e){setMessage(safeError(e),true);}}
     static String maskPhone(String p){return p.length()==11?p.substring(0,3)+" ···· "+p.substring(7):p;}
     private boolean hasActive(){for(Device d:devices)if(d.canEnd())return true;return false;}
-    private String deviceState(Device d){return d.canEnd()?"正在出水":d.status==-1?"正在自动检测状态":"空闲";}
+    private String deviceState(Device d){return d.restored?"正在核实上次接水状态":d.canEnd()?"正在出水":d.status==-1?"正在自动检测状态":"空闲";}
     private void updateDeviceViews(){for(Device d:devices){Button b=controlButtons.get(d.id);if(b!=null){setText(b,d.canEnd()?"停止出水":"开始出水");b.setEnabled(!busy);styleControl(d.id,b,d.canEnd(),true);}TextView label=statusLabels.get(d.id);if(label!=null)setText(label,deviceState(d)+"  ·  "+d.id);}}
     @Override protected void onActivityResult(int r,int result,Intent data){super.onActivityResult(r,result,data);if(r==200&&result==RESULT_OK&&data!=null&&!loginPage)addDialog(data.getStringExtra("code"));}
     private void addDialog(String raw){
@@ -237,7 +260,7 @@ public class MainActivity extends Activity {
     }
     private static final class Snapshot {List<Device> devices;String wallet="",warning="";}
     void refresh(){
-        if(busy||loginPage)return;operationVersion++;final String t=token;final List<Device> cached=new ArrayList<>();for(Device d:devices){Device c=new Device(d.id,d.name);c.pinned=d.pinned;c.ownStart=d.ownStart;c.running=d.running;c.idleChecks=d.idleChecks;cached.add(c);}final Set<String> hidden=store.hidden(phone);
+        if(busy||loginPage)return;operationVersion++;final String t=token;final List<Device> cached=new ArrayList<>();for(Device d:devices){Device c=new Device(d.id,d.name);c.pinned=d.pinned;c.ownStart=d.ownStart;c.running=d.running;c.restored=d.restored;c.idleChecks=d.idleChecks;cached.add(c);}final Set<String> hidden=store.hidden(phone);
         setMessage("正在刷新…",false);
         refreshing=true;
         job(()->{
@@ -247,7 +270,7 @@ public class MainActivity extends Activity {
             for(Device d:cached){try{d.acceptStatus(IlifeApi.statusValue(api.status(t,d.id)));}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;d.idleChecks=0;d.status=-1;s.warning="部分设备状态暂未更新，正在自动重试。";}catch(Exception e){d.idleChecks=0;d.status=-1;s.warning="部分设备状态暂未更新，正在自动重试。";}}
             try{IlifeApi.Result r=api.wallet(t);r.require();JSONObject data=r.data();List<JSONObject> wallets=new ArrayList<>();if(data.optJSONObject("aw")!=null)wallets.add(data.getJSONObject("aw"));JSONArray eps=data.optJSONArray("eps");if(eps!=null)for(int i=0;i<eps.length();i++)wallets.add(eps.getJSONObject(i));LinkedHashSet<String> seen=new LinkedHashSet<>();StringBuilder out=new StringBuilder();for(JSONObject w:wallets){JSONObject ep=w.optJSONObject("ep");if(ep==null||!seen.add(ep.optString("id")))continue;double amount=w.optDouble("total",w.optDouble("olCash",w.optDouble("balance",Double.NaN)));if(Double.isNaN(amount))continue;if(out.length()>0)out.append(" / ");out.append(ep.optString("name","余额")).append(" ¥").append(String.format(Locale.CHINA,"%.2f",amount));}s.wallet=out.toString();}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;}catch(Exception ignored){}
             return s;
-        },s->{refreshing=false;devices=s.devices;wallet=s.wallet;message=s.warning;save();showDevices();},e->{refreshing=false;for(Device d:devices){d.status=-1;d.checkedAt=0;}wallet="";message=safeError(e);showDevices();});
+        },s->{refreshing=false;lastPoll=SystemClock.elapsedRealtime();devices=s.devices;wallet=s.wallet;message=s.warning;save();showDevices();},e->{refreshing=false;for(Device d:devices){d.status=-1;d.checkedAt=0;}wallet="";message=safeError(e);showDevices();});
     }
     private void control(Device d,boolean start){
         if(busy)return;operationVersion++;final String t=token;final boolean wasRunning=d.running;final long previousStart=d.ownStart;
@@ -289,6 +312,3 @@ public class MainActivity extends Activity {
         @Override protected void onDetachedFromWindow(){finishMotion();super.onDetachedFromWindow();}
     }
 }
-
-
-

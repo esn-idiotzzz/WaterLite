@@ -1,66 +1,9 @@
-# 轻饮水 1.1.0
+# 构建
 
-面向小米15 / Android15需求制作的慧生活798精简客户端。Java 原生 Android View，使用系统 Material 主题、系统字体、原生输入框和对话框；跟随深浅色，Android12及以上全局使用系统莫奈配色。无 WebView，无底部导航。
+Gradle工程：JDK17、Android SDK35、AGP8.9.2、Gradle8.11.1。设置local.properties的sdk.dir；复制secrets.properties.example为secrets.properties，提供APP_LOGIN_SALT（设备登录协议配置）。占位或空配置可编译，但不能实际登录。配置不纳入版本控制。
 
-## 功能
+运行gradlew.bat assembleDebug（Linux使用./gradlew assembleDebug）。自行debug签名不能覆盖交付正式包。发布签名密钥、密码及私有协议配置不在仓库中。
 
-- 无本机登录凭证，或已明确确认凭证过期时，进入短信登录页。
-- 登录后同步账号收藏设备，合并本机扫码添加的快捷设备。
-- 扫码或手动输入二维码内容/设备编号；先从服务端检查设备，成功后保存。
-- 设备状态、钱包余额、开始/停止出水。单击立即切换按钮并调用原出水/结束接口，不弹二次确认，控制请求不自动重试。
-- 前台自动检测设备；运行中约每1.5秒检测，空闲时约每8秒检测。持续使用时连续5次返回空闲才恢复开始按钮，并补发结束接口收尾。状态失败保留运行标记并自动重试。
-- 保留后台返回时立即发起新状态查询；已过7.5秒启动保护期的设备，新的空闲响应可立即恢复开始按钮，不必再等待五轮。刚启动时仍保留空闲延迟保护；网络失败保留停止操作并重试。进入后台会取消旧状态请求，其结果不会污染返回后的新状态。
-- 开始按钮跟随系统莫奈主色，停止按钮保留语义红色；背景和文字同步进行200毫秒颜色过渡，按下有轻微缩放。左划操作区随手势渐显，按滑动速度决定展开或收起，220毫秒平滑归位；置顶后卡片平滑移位。刷新位于主页左下角，与右下角扫码按钮对齐，刷新中旋转。
-- 全局共用颜色角色：页面、卡片、文字、按钮、图标、菜单、弹窗、输入框、系统栏及扫码页保持同一套配色。Android12及以上引用系统的 accent/neutral 色阶，Android8–11使用配套深浅色回退主题。相机预览和验证码图片保留原像素。系统取色机制参考 [AOSP 动态颜色文档](https://source.android.com/docs/core/display/material)。
-- 设备列表复用卡片和按钮，普通刷新不重建页面、不重置滚动位置；按钮和状态文字无变化时不重复更新。动画尊重系统动画开关，后台取消动画及刷新旋转，恢复时显示正确状态。
-- 相同设备快照不重复落盘；设备列表、隐藏记录和短信倒计时使用异步保存，登录凭证仍加密并同步保存。扫码复用解码器、亮度缓冲区及画笔，减少重复分配，退出扫码页后忽略旧识别结果。
-- 停止按钮依赖实时运行状态，不依赖本机启动记录或10分钟期限；检测请求不会阻塞停止命令，旧检测响应不能覆盖更新的控制结果。检测只更新按钮和状态文字，不重建整个列表。
-- 左划置顶/取消置顶、删除；长按也可操作或改名称。
-- 删除只隐藏本应用快捷入口，避免下次同步恢复；不会修改服务器收藏。重新扫码同一编号可以恢复。
-- 登录凭证由 Android Keystore AES-GCM 加密，设备按手机号隔离保存，关闭系统备份。
-- 只有文档与源码确认的 `code=-99` 才进入重新验证。非零业务码、HTTP错误、超时、断网、JSON解析失败都不会直接清空凭证。
-- 服务端真实过期需要短信重新验证；没有加入未经确认的续期接口。
+交付APK实际使用JDK27的Java8兼容输出、API34平台库、targetSdk35、aapt/D8/zipalign/apksigner构建。build-local.ps1接受ToolsDir、JavaHome、SigningKey、PasswordFile、LoginSaltFile与Tests参数；ToolsDir需含android.jar、r8.jar、zxing.jar和build-tools。LoginSaltFile是仅包含协议签名参数的一行文本文件。勿提交真实配置或生成的BuildConfig.java。
 
-## 构建
-
-标准工程：JDK17、Android SDK35、Build Tools35、AGP8.9.2、Gradle8.11.1。设置 `local.properties` 的 sdk.dir 后，运行 `gradlew.bat assembleDebug`。二维码依赖从 Maven 获取。
-
-当前交付 APK 实际使用 JDK27 的 Java8兼容输出、本机API34平台库、targetSdk35、D8、aapt、zipalign、apksigner直接构建与签名。标准Gradle工程配置compileSdk35。`build-local.ps1` 提供同样的直接构建路径，需传入 ToolsDir、JavaHome、SigningKey、PasswordFile；ToolsDir 内需要 android.jar、r8.jar、zxing.jar，以及含 aapt.exe、zipalign.exe、lib/apksigner.jar 的 build-tools 目录。密钥密码文件仅在本机使用，不能加入源码仓库。
-
-交付 APK 是独立签名包 `com.joe.waterlite`。自行构建的 debug 签名与交付签名不同，不能直接覆盖更新；未来原包更新需要保留本次签名密钥。签名密钥未包含在源码压缩包内。
-
-## 测试
-
-独立测试源码位于 `app/src/androidTest`，不会打入交付应用。自定义 Instrumentation 使用假接口响应；不会发送真实短信、登录或出水命令。可以使用 `connectedDebugAndroidTest`，或直接构建独立测试包后运行 `am instrument -w com.joe.waterlite.tests/com.joe.waterlite.RegressionInstrumentation`。
-
-默认系统配色的深色和浅色模式各69项检查通过；将模拟器系统色种子切换为746BC1后，主色从#2E6195变为#5D5698，浅色模式再次通过69项检查。完整结果见test-results.txt。包含原有登录、扫码解析、设备、开关水、自动停水和左划检查，以及主题文字对比度、系统莫奈主色、原生控件主题、关闭动画后的启停和刷新、14台设备长列表滚动、刷新保留按钮实例与滚动位置、置顶使用刷新后的设备对象。后台恢复测试用moveTaskToBack将任务送到后台，再将同一Activity带回前台，不清理任务或进程。测试结束恢复模拟器原系统主题设置。
-
-测试环境是本机MuMu Android12L/API32模拟器；1.1.0已完成竖屏交互和截图检查，目标版本为API35。测试服务端响应由独立测试包模拟，前后台切换使用真实任务生命周期。未在小米15/Android15实机运行，未测量实机帧率或功耗。公共图形验证码接口在此前版本已实际加载成功。真实账号登录、余额、物理相机扫码、实际出水及数日登录稳定性需要用户实机验证。预览图中的设备和余额为测试数据。
-
-## 原问题证据
-
-用户提供 APK 为 `com.ncepu.jw`，版本4.25，versionCode56。反编译 `xg` 中的账号检查失败分支会清空 `water_token`。公开源代码 `MainActivity.kt` 的 `loadWaterDevices()` 同样在 `if (!check.ok)` 分支清空 token，未区分服务错误与真正过期。新版使用 `SessionPolicy.expired()` 的显式失效码判断。
-
-网络请求保持原饮水接口协议：设备控制平台 ApplicationType `1,1`，发送短信平台 `1,5`，客户端协议版本 `8.2.9`。只使用正常手机号验证码验证，不尝试绕过鉴权。
-
-许可证与来源见 NOTICE.md 和 LICENSE。
-
-## 1.0.1 操作逻辑修复
-
-对照原 `MainActivity.kt` 的 `toggleWaterDevice()`、`ensureWaterPoller()` 和 `pollWaterDevice()`：原实现先切换按钮，再调用开始/结束接口；运行中每1.5秒轮询，连续5次空闲后清理。本版修复1.0.0中单次空闲响应过早恢复按钮、依赖本机启动标记而不允许停止、仅检测本机启动设备、检测占用控制操作、出水前额外状态请求及确认弹窗的问题。
-
-保留包名、Keystore别名、原签名和数据字段，versionCode升至2，可以从1.0.0直接覆盖更新，保留登录和已添加设备。
-
-## 1.0.2 返回前台与交互调整
-
-1.0.1在后台停止检测，返回时沿用连续5轮空闲的确认规则，造成设备已停仍显示停止按钮数秒。本版为返回前台增加一次新的状态核实，仅在设备已过启动保护期且响应明确为空闲时快速恢复。旧请求会被取消，并通过独立状态序号过滤过期响应。不会仅根据时间或断网来假定设备已停。
-
-保留包名、签名、Keystore别名和数据字段，versionCode升至3，支持从1.0.0或1.0.1覆盖更新。
-
-## 1.1.0 莫奈配色与流畅性优化
-
-原先自绘页面、扫码页及系统控件存在不同的颜色来源，本版统一为AppPalette和主题资源。开始按钮由固定蓝色改为系统主色，停止仍使用配套红色和前景色。列表按设备编号复用行，刷新保留滚动和控制按钮，置顶动作绑定当前设备；取消旧滑动收尾动画后再收起操作区，避免操作区重新弹出。
-
-轮询调度及扫码限流改用单调时钟；设备快照去重、异步保存和扫码缓存减少主线程阻塞及内存分配。登录、设备接口和启停状态保护规则保持原实现。保留包名、签名、Keystore别名和数据字段，versionCode升至4，支持从1.0.0–1.0.2直接覆盖更新。
-
-本版修改文件：`MainActivity.java`（列表与动画）、`ScanActivity.java`（扫码与主题）、`Store.java`（设备保存）、`AppPalette.java`（新增共享颜色）、四套`colors.xml`（新增）、两套`styles.xml`、四个图标；版本同步至Manifest、app/build.gradle及构建脚本。`RegressionInstrumentation.java`增加17项回归检查；README、使用说明与测试记录同步更新。
+独立测试源码位于app/src/androidTest，未打入正式APK。运行am instrument -w com.joe.waterlite.tests/com.joe.waterlite.RegressionInstrumentation；-e mode seed写入模拟出水会话，随后am force-stop com.joe.waterlite，再以-e mode cold启动测试，验证独立进程读取与恢复。测试场景只使用fixture凭据和模拟接口。
