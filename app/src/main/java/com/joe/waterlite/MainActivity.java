@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     private int generation, captchaGeneration;
     private boolean busy, foreground, loginPage;
     private boolean polling;
+    private boolean syncing, startupSyncPending;
     private boolean resumeSync=true;
     private volatile int statusGeneration;
     private volatile Thread pollingThread;
@@ -58,7 +59,7 @@ public class MainActivity extends Activity {
     private AlertDialog updateDialog;
     private void checkUpdate(){
         if(checkingUpdate)return;checkingUpdate=true;
-        updateWorker.execute(()->{UpdateClient.Release found=null;try{found=new UpdateClient().latest();}catch(Exception ignored){}final UpdateClient.Release release=found;handler.post(()->{checkingUpdate=false;if(isDestroyed())return;if(release!=null&&release.newerThan("1.3.0"))pendingUpdate=release;showUpdate();});});
+        updateWorker.execute(()->{UpdateClient.Release found=null;try{found=new UpdateClient().latest();}catch(Exception ignored){}final UpdateClient.Release release=found;handler.post(()->{checkingUpdate=false;if(isDestroyed())return;if(release!=null&&release.newerThan("1.3.1"))pendingUpdate=release;showUpdate();});});
     }
     private void showUpdate(){
         if(!foreground||busy||pendingUpdate==null||updateDialog!=null||pendingAddDialog!=null)return;
@@ -77,10 +78,15 @@ public class MainActivity extends Activity {
     private boolean captchaReady;
     private long lastPoll;
     private AlertDialog pendingAddDialog;
+    private final Runnable startupSync=new Runnable(){ public void run(){
+        if(!startupSyncPending||!foreground||loginPage)return;
+        if(busy||syncing){handler.postDelayed(this,250);return;}
+        startupSyncPending=false;syncDevices(true);
+    }};
     private final Runnable ticker=new Runnable(){ public void run(){
         if(!foreground)return;
         updateCooldown();showUpdate();
-        if(!loginPage && !busy && !polling && !devices.isEmpty() && SystemClock.elapsedRealtime()-lastPoll>=(hasActive()?1500:8000)) { lastPoll=SystemClock.elapsedRealtime(); pollDevices(); }
+        if(!loginPage && !busy && !syncing && !polling && !devices.isEmpty() && SystemClock.elapsedRealtime()-lastPoll>=(hasActive()?1500:8000)) { lastPoll=SystemClock.elapsedRealtime(); pollDevices(); }
         handler.postDelayed(this,500);
     }};
 
@@ -92,13 +98,13 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(bg); getWindow().setNavigationBarColor(bg);
         getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         try { token=store.token(); } catch(Exception e){ message="本机登录信息无法读取，请重新验证手机号。设备会保留。"; }
-        devices=store.devices(phone);
-        if(token.isEmpty() || store.reauth()) showLogin(); else {showDevices();refresh();}
+        devices=store.devices(phone);wallet=store.wallet(phone);
+        if(token.isEmpty() || store.reauth()) showLogin(); else {startupSyncPending=true;showDevices();}
         if(state!=null && loginPage){phoneInput.setText(state.getString("inputPhone",phone));smsInput.setText(state.getString("inputSms",""));}
     }
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);if(loginPage){state.putString("inputPhone",phoneInput.getText().toString());state.putString("inputSms",smsInput.getText().toString());}}
-    @Override protected void onResume(){super.onResume();foreground=true;checkUpdate();lastPoll=0;updateRefreshButton();handler.removeCallbacks(ticker);handler.post(ticker);}
-    @Override protected void onPause(){foreground=false;resumeSync=true;statusGeneration++;if(pollFuture!=null)pollFuture.cancel(true);api.cancelStatusRequests(pollingThread);polling=false;handler.removeCallbacks(ticker);cancelControlAnimations();updateDeviceViews();updateRefreshButton();for(Button b:controlButtons.values()){b.animate().cancel();b.setScaleX(1);b.setScaleY(1);}for(SwipeRow row:deviceRows.values())row.finishMotion();super.onPause();}
+    @Override protected void onResume(){super.onResume();foreground=true;checkUpdate();lastPoll=0;updateRefreshButton();handler.removeCallbacks(ticker);handler.post(ticker);if(startupSyncPending){handler.removeCallbacks(startupSync);handler.postDelayed(startupSync,220);}}
+    @Override protected void onPause(){foreground=false;resumeSync=true;statusGeneration++;if(pollFuture!=null)pollFuture.cancel(true);api.cancelStatusRequests(pollingThread);polling=false;handler.removeCallbacks(ticker);handler.removeCallbacks(startupSync);cancelControlAnimations();updateDeviceViews();updateRefreshButton();for(Button b:controlButtons.values()){b.animate().cancel();b.setScaleX(1);b.setScaleY(1);}for(SwipeRow row:deviceRows.values())row.finishMotion();super.onPause();}
     @Override protected void onDestroy(){generation++;captchaGeneration++;worker.shutdownNow();statusWorker.shutdownNow();updateWorker.shutdownNow();if(updateDialog!=null)updateDialog.dismiss();handler.removeCallbacksAndMessages(null);cancelControlAnimations();if(refreshAnimation!=null)refreshAnimation.cancel();super.onDestroy();}
     int dp(float n){return (int)(getResources().getDisplayMetrics().density*n+.5f);}
     private TextView text(String s,int size,int color){TextView v=new TextView(this);v.setText(s);v.setTextSize(size);v.setTextColor(color);v.setFontFeatureSettings("kern");return v;}
@@ -156,7 +162,7 @@ public class MainActivity extends Activity {
     private EditText field(String hint,int type){EditText e=new EditText(this);e.setSingleLine(true);e.setTextSize(17);e.setTextColor(ink);e.setHintTextColor(muted);e.setHighlightColor(tint);e.setHint(hint);e.setInputType(type);e.setPadding(dp(16),dp(12),dp(16),dp(12));GradientDrawable d=shape(card,12);d.setStroke(dp(1),palette.outline);e.setBackground(d);e.setMinHeight(dp(56));return e;}
     private void label(LinearLayout l,String label){TextView v=text(label,13,muted);v.setPadding(dp(2),0,0,dp(8));l.addView(v);}
     private void showLogin(){
-        refreshing=false;updateRefreshButton();refreshButton=null;scanButton=null;
+        startupSyncPending=false;handler.removeCallbacks(startupSync);refreshing=false;updateRefreshButton();refreshButton=null;scanButton=null;
         cancelControlAnimations();deviceRows.clear();controlButtons.clear();statusLabels.clear();statusDots.clear();deviceList=null;deviceScroll=null;
         loginPage=true;mount();ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);root.addView(scroll);
         LinearLayout body=column();body.setPadding(dp(24),dp(24),dp(24),dp(24));scroll.addView(body);
@@ -198,7 +204,7 @@ public class MainActivity extends Activity {
     private void login(){
         final String p=phoneInput.getText().toString().trim(), code=smsInput.getText().toString().trim();
         if(!p.matches("1[0-9]{10}")){phoneInput.setError("请输入正确的手机号");return;}if(!code.matches("[0-9]{4,8}")){smsInput.setError("请填写短信验证码");return;}
-        job(()->{IlifeApi.Result r=api.login(p,code);r.require();JSONObject al=r.data().optJSONObject("al");String t=al==null?"":al.optString("token","");if(t.isEmpty())throw new Exception("登录返回异常，未获取到凭证，请重试");store.login(p,t);return t;},t->{generation++;token=t;phone=p;devices=store.devices(p);message="";wallet="";showDevices();refresh();},e->setMessage(safeError(e),false));
+        job(()->{IlifeApi.Result r=api.login(p,code);r.require();JSONObject al=r.data().optJSONObject("al");String t=al==null?"":al.optString("token","");if(t.isEmpty())throw new Exception("登录返回异常，未获取到凭证，请重试");store.login(p,t);return t;},t->{generation++;token=t;phone=p;devices=store.devices(p);wallet=store.wallet(p);message="";startupSyncPending=false;showDevices();refresh();},e->setMessage(safeError(e),false));
     }
     void showDevices(){
         if(!loginPage&&deviceList!=null){renderDevices();return;}
@@ -238,7 +244,7 @@ public class MainActivity extends Activity {
     private SwipeRow deviceRow(Device d){
         SwipeRow row=new SwipeRow(this);row.device=d;row.setMinimumHeight(dp(112));
         LinearLayout actions=horizontal();actions.setGravity(Gravity.CENTER_VERTICAL);actions.setPadding(dp(8),0,dp(8),0);actions.setAlpha(0);actions.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        row.pinAction=swipeAction(R.drawable.ic_pin,d.pinned?"取消置顶":"置顶",palette.onPrimaryContainer,palette.primaryContainer,v->{if(busy)return;row.finishMotion();row.position(0);row.device.pinned=!row.device.pinned;save();showDevices();});
+        row.pinAction=swipeAction(R.drawable.ic_pin,d.pinned?"取消置顶":"置顶",palette.onPrimaryContainer,palette.primaryContainer,v->{if(busy)return;operationVersion++;row.finishMotion();row.position(0);row.device.pinned=!row.device.pinned;save();showDevices();});
         row.pinGlyph=(ImageView)row.pinAction.getChildAt(0);row.pinCaption=(TextView)row.pinAction.getChildAt(1);row.pinGlyph.setRotation(d.pinned?45f:0f);
         LinearLayout remove=swipeAction(R.drawable.ic_delete,"删除",danger,palette.errorContainer,v->remove(row.device));
         LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(0,-1,1);pp.rightMargin=dp(8);actions.addView(row.pinAction,pp);actions.addView(remove,new LinearLayout.LayoutParams(0,-1,1));
@@ -253,40 +259,80 @@ public class MainActivity extends Activity {
         control.setMinWidth(dp(96));control.setMinHeight(dp(44));control.setMinimumHeight(dp(44));control.setPadding(dp(18),0,dp(18),0);((GradientDrawable)((RippleDrawable)control.getBackground()).getDrawable(0)).setCornerRadius(dp(22));
         styleControl(d.id,control,d.canEnd(),false);control.setOnTouchListener((v,e)->{if(!animateMotion()){v.animate().cancel();v.setScaleX(1);v.setScaleY(1);return false;}if(e.getActionMasked()==MotionEvent.ACTION_DOWN)v.animate().scaleX(.97f).scaleY(.97f).setDuration(90).setInterpolator(motionCurve).start();else if(e.getActionMasked()==MotionEvent.ACTION_UP||e.getActionMasked()==MotionEvent.ACTION_CANCEL)v.animate().scaleX(1).scaleY(1).setDuration(150).setInterpolator(motionCurve).start();return false;});
         control.setEnabled(!busy);controlButtons.put(d.id,control);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-2,dp(44));bp.leftMargin=dp(12);bp.gravity=Gravity.CENTER_VERTICAL;content.addView(control,bp);
-        content.setOnLongClickListener(v->{if(busy)return true;new AlertDialog.Builder(this).setTitle(row.device.name).setItems(new String[]{row.device.pinned?"取消置顶":"置顶","修改名称","删除"},(a,n)->{if(busy)return;Device current=row.device;if(n==0){row.finishMotion();row.position(0);current.pinned=!current.pinned;save();showDevices();}else if(n==1)rename(current);else remove(current);}).show();return true;});
+        content.setOnLongClickListener(v->{if(busy)return true;operationVersion++;new AlertDialog.Builder(this).setTitle(row.device.name).setItems(new String[]{row.device.pinned?"取消置顶":"置顶","修改名称","删除"},(a,n)->{if(busy)return;Device current=row.device;if(n==0){operationVersion++;row.finishMotion();row.position(0);current.pinned=!current.pinned;save();showDevices();}else if(n==1)rename(current);else remove(current);}).show();return true;});
         row.addView(content,new FrameLayout.LayoutParams(-1,-1));row.front=content;return row;
     }
     private int statusColor(Device d){return d.canEnd()?danger:d.status==-1?muted:accent;}
-    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.3.0").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
+    private void menu(View anchor){PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("手动添加");p.getMenu().add("关于");p.getMenu().add("退出登录");p.setOnMenuItemClickListener(i->{if(busy){setMessage("正在处理，请稍候。",true);return true;}switch(i.getTitle().toString()){case "手动添加":addDialog("");break;case "关于":new AlertDialog.Builder(this).setTitle("轻饮水 1.3.1").setMessage("仅保留慧生活798饮水功能。\n\n登录信息由 Android Keystore 加密保存在本机。相机仅用于扫码。\n\n删除只移除本应用快捷入口，不改变慧生活798的账号收藏。\n\n饮水接口改编自 abcde2333/NcepuJw，GPL-3.0；扫码使用 ZXing，Apache-2.0。\n\n服务端明确令登录凭证失效时，仍需短信重新验证。").setPositiveButton("知道了",null).show();break;case "退出登录":logout();}return true;});p.show();}
     private void logout(){if(hasActive()){setMessage("请先结束正在进行的接水。",true);return;}new AlertDialog.Builder(this).setTitle("退出登录？").setMessage("已添加的饮水机和置顶设置会保留。").setNegativeButton("取消",null).setPositiveButton("退出",(a,w)->{generation++;store.logout();token="";message="";showLogin();}).show();}
-    private void remove(Device d){if(busy)return;if(d.canEnd()){setMessage("请先停止这台设备的出水。",true);return;}new AlertDialog.Builder(this).setTitle("删除「"+d.name+"」？").setMessage("移除本应用快捷入口，之后可重新扫码添加。").setNegativeButton("取消",null).setPositiveButton("删除",(a,w)->{try{Set<String> ids=store.hidden(phone);ids.add(d.id);store.hidden(phone,ids);devices.remove(d);store.devices(phone,devices);showDevices();}catch(Exception e){setMessage(safeError(e),true);}}).show();}
-    private void rename(Device d){EditText input=field("设备名称",InputType.TYPE_CLASS_TEXT);input.setText(d.name);new AlertDialog.Builder(this).setTitle("修改名称").setView(input).setNegativeButton("取消",null).setPositiveButton("保存",(a,w)->{String name=input.getText().toString().trim();if(!name.isEmpty()){d.name=name;save();showDevices();}}).show();}
+    private void remove(Device d){if(busy)return;operationVersion++;if(d.canEnd()){setMessage("请先停止这台设备的出水。",true);return;}new AlertDialog.Builder(this).setTitle("删除「"+d.name+"」？").setMessage("移除本应用快捷入口，之后可重新扫码添加。").setNegativeButton("取消",null).setPositiveButton("删除",(a,w)->{try{Set<String> ids=store.hidden(phone);ids.add(d.id);store.hidden(phone,ids);devices.remove(d);store.devices(phone,devices);showDevices();}catch(Exception e){setMessage(safeError(e),true);}}).show();}
+    private void rename(Device d){operationVersion++;EditText input=field("设备名称",InputType.TYPE_CLASS_TEXT);input.setText(d.name);new AlertDialog.Builder(this).setTitle("修改名称").setView(input).setNegativeButton("取消",null).setPositiveButton("保存",(a,w)->{String name=input.getText().toString().trim();if(!name.isEmpty()){operationVersion++;d.name=name;save();showDevices();}}).show();}
     private void save(){try{store.devices(phone,devices);}catch(Exception e){setMessage(safeError(e),true);}}
     static String maskPhone(String p){return p.length()==11?p.substring(0,3)+" ···· "+p.substring(7):p;}
     private boolean hasActive(){for(Device d:devices)if(d.canEnd())return true;return false;}
     private String deviceState(Device d){return d.restored?"正在核实上次接水状态":d.canEnd()?"正在出水":d.status==-1?"正在自动检测状态":"空闲";}
-    private void updateDeviceViews(){for(Device d:devices){Button b=controlButtons.get(d.id);if(b!=null){setText(b,d.canEnd()?"停止出水":"开始出水");b.setEnabled(!busy);styleControl(d.id,b,d.canEnd(),true);}TextView label=statusLabels.get(d.id);if(label!=null)setText(label,deviceState(d)+"  ·  "+d.id);View dot=statusDots.get(d.id);if(dot!=null)dot.setBackground(shape(statusColor(d),3));}}
+    private void updateDeviceViews(){for(Device d:devices){Button b=controlButtons.get(d.id);if(b!=null){setText(b,d.canEnd()?"停止出水":"开始出水");b.setEnabled(!busy);styleControl(d.id,b,d.canEnd(),true);}TextView label=statusLabels.get(d.id);if(label!=null)setStatusLabel(label,deviceState(d)+"  ·  "+d.id);View dot=statusDots.get(d.id);if(dot!=null)dot.setBackground(shape(statusColor(d),3));}}
+    private void setStatusLabel(TextView label,String text){
+        if(TextUtils.equals(label.getText(),text))return;
+        label.setText(text);
+        if(animateMotion()){label.animate().cancel();label.setAlpha(.55f);label.animate().alpha(1f).setDuration(180).start();}
+    }
     @Override protected void onActivityResult(int r,int result,Intent data){super.onActivityResult(r,result,data);if(r==200&&result==RESULT_OK&&data!=null&&!loginPage)addDialog(data.getStringExtra("code"));}
     private void addDialog(String raw){
         String parsed=DeviceIdParser.parse(raw);LinearLayout box=column();box.setPadding(dp(24),dp(12),dp(24),0);EditText id=field("二维码内容或设备编号",InputType.TYPE_CLASS_TEXT);id.setText(parsed.isEmpty()?raw:parsed);box.addView(id);gap(box,16);EditText name=field("设备名称（可选）",InputType.TYPE_CLASS_TEXT);box.addView(name);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("添加饮水机").setView(box).setNegativeButton("取消",null).setPositiveButton("添加",null).create();
         pendingAddDialog=dialog;dialog.setOnDismissListener(x->{if(pendingAddDialog==dialog)pendingAddDialog=null;});
         dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String did=DeviceIdParser.parse(id.getText().toString());if(did.isEmpty()){id.setError("未识别到设备编号，请扫描饮水机机身码");return;}for(Device d:devices)if(d.id.equals(did)){setMessage("这台饮水机已经添加。",true);dialog.dismiss();return;}
-            final String t=token,label=name.getText().toString().trim();dialog.getButton(-1).setEnabled(false);job(()->{IlifeApi.Result status=api.status(t,did);int value=IlifeApi.statusValue(status);String serverName=status.data().getJSONObject("device").optString("name","");Device d=new Device(did,label.isEmpty()?serverName:label);d.acceptStatus(value);return d;},d->{try{Set<String> hidden=store.hidden(phone);hidden.remove(did);store.hidden(phone,hidden);devices.add(d);store.devices(phone,devices);message="已添加饮水机";dialog.dismiss();showDevices();}catch(Exception e){dialog.getButton(-1).setEnabled(true);setMessage(safeError(e),true);}},e->{dialog.getButton(-1).setEnabled(true);setMessage(safeError(e),true);});}));dialog.show();
+            final String t=token,label=name.getText().toString().trim();dialog.getButton(-1).setEnabled(false);job(()->{IlifeApi.Result status=api.status(t,did);int value=IlifeApi.statusValue(status);String serverName=status.data().getJSONObject("device").optString("name","");Device d=new Device(did,label.isEmpty()?serverName:label);d.acceptStatus(value);return d;},d->{operationVersion++;try{Set<String> hidden=store.hidden(phone);hidden.remove(did);store.hidden(phone,hidden);devices.add(d);store.devices(phone,devices);message="已添加饮水机";dialog.dismiss();showDevices();}catch(Exception e){dialog.getButton(-1).setEnabled(true);setMessage(safeError(e),true);}},e->{dialog.getButton(-1).setEnabled(true);setMessage(safeError(e),true);});}));dialog.show();
     }
-    private static final class Snapshot {List<Device> devices;String wallet="",warning="";}
-    void refresh(){
-        if(busy||loginPage)return;operationVersion++;final String t=token;final List<Device> cached=new ArrayList<>();for(Device d:devices){Device c=new Device(d.id,d.name);c.pinned=d.pinned;c.ownStart=d.ownStart;c.running=d.running;c.restored=d.restored;c.idleChecks=d.idleChecks;cached.add(c);}final Set<String> hidden=store.hidden(phone);
-        setMessage("正在刷新…",false);
-        refreshing=true;
-        job(()->{
+    private static final class Snapshot {List<Device> devices;String wallet="",warning="";boolean walletLoaded;}
+    void refresh(){startupSyncPending=false;syncDevices(false);}
+    private void syncDevices(final boolean silent){
+        if(busy||syncing||loginPage)return;
+        if(silent&&!foreground)return;
+        startupSyncPending=false;operationVersion++;
+        final int epoch=generation,revision=operationVersion;
+        final String t=token;
+        final List<Device> cached=new ArrayList<>();
+        for(Device d:devices){Device c=new Device(d.id,d.name);c.pinned=d.pinned;c.ownStart=d.ownStart;c.running=d.running;c.restored=d.restored;c.idleChecks=d.idleChecks;cached.add(c);}
+        final Set<String> hidden=store.hidden(phone);
+        if(silent){syncing=true;lastPoll=SystemClock.elapsedRealtime();}
+        else {refreshing=true;setMessage("正在刷新…",false);}
+        Callable<Snapshot> load=()->{
             Snapshot s=new Snapshot();s.devices=cached;
             IlifeApi.Result account=api.account(t);account.require();
             try{IlifeApi.Result list=api.devices(t);list.require();JSONArray favos=list.data().optJSONArray("favos");if(favos==null)throw new Exception("设备列表响应异常");for(int i=0;i<favos.length();i++){JSONObject o=favos.getJSONObject(i);String id=o.optString("id","");if(!DeviceIdParser.valid(id)||hidden.contains(id))continue;boolean exists=false;for(Device d:cached)if(d.id.equals(id))exists=true;if(!exists)cached.add(new Device(id,o.optString("name","")));}}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;s.warning="部分数据未更新，请稍后刷新。";}catch(Exception e){s.warning="部分数据未更新，请稍后刷新。";}
             for(Device d:cached){try{d.acceptStatus(IlifeApi.statusValue(api.status(t,d.id)));}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;d.idleChecks=0;d.status=-1;s.warning="部分设备状态暂未更新，正在自动重试。";}catch(Exception e){d.idleChecks=0;d.status=-1;s.warning="部分设备状态暂未更新，正在自动重试。";}}
-            try{IlifeApi.Result r=api.wallet(t);r.require();JSONObject data=r.data();List<JSONObject> wallets=new ArrayList<>();if(data.optJSONObject("aw")!=null)wallets.add(data.getJSONObject("aw"));JSONArray eps=data.optJSONArray("eps");if(eps!=null)for(int i=0;i<eps.length();i++)wallets.add(eps.getJSONObject(i));LinkedHashSet<String> seen=new LinkedHashSet<>();StringBuilder out=new StringBuilder();for(JSONObject w:wallets){JSONObject ep=w.optJSONObject("ep");if(ep==null||!seen.add(ep.optString("id")))continue;double amount=w.optDouble("total",w.optDouble("olCash",w.optDouble("balance",Double.NaN)));if(Double.isNaN(amount))continue;if(out.length()>0)out.append(" / ");out.append(ep.optString("name","余额")).append(" ¥").append(String.format(Locale.CHINA,"%.2f",amount));}s.wallet=out.toString();}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;}catch(Exception ignored){}
+            try{IlifeApi.Result r=api.wallet(t);r.require();JSONObject data=r.data();List<JSONObject> wallets=new ArrayList<>();if(data.optJSONObject("aw")!=null)wallets.add(data.getJSONObject("aw"));JSONArray eps=data.optJSONArray("eps");if(eps!=null)for(int i=0;i<eps.length();i++)wallets.add(eps.getJSONObject(i));LinkedHashSet<String> seen=new LinkedHashSet<>();StringBuilder out=new StringBuilder();for(JSONObject w:wallets){JSONObject ep=w.optJSONObject("ep");if(ep==null||!seen.add(ep.optString("id")))continue;double amount=w.optDouble("total",w.optDouble("olCash",w.optDouble("balance",Double.NaN)));if(Double.isNaN(amount))continue;if(out.length()>0)out.append(" / ");out.append(ep.optString("name","余额")).append(" ¥").append(String.format(Locale.CHINA,"%.2f",amount));}s.wallet=out.toString();s.walletLoaded=true;}catch(IlifeApi.ApiException e){if(e.result.expired())throw e;}catch(Exception ignored){}
             return s;
-        },s->{refreshing=false;lastPoll=SystemClock.elapsedRealtime();devices=s.devices;wallet=s.wallet;message=s.warning;save();showDevices();},e->{refreshing=false;for(Device d:devices){d.status=-1;d.checkedAt=0;}wallet="";message=safeError(e);showDevices();});
+        };
+        if(silent){worker.execute(()->{try{Snapshot s=load.call();handler.post(()->finishSync(s,true,epoch,revision));}catch(Exception e){handler.post(()->failSync(e,true,epoch,revision));}});}
+        else {job(load,s->finishSync(s,false,epoch,revision),e->failSync(e,false,epoch,revision));}
+    }
+    private void finishSync(Snapshot s,boolean silent,int epoch,int revision){
+        if(silent)syncing=false;
+        if(epoch!=generation||isFinishing())return;
+        if(revision!=operationVersion||loginPage){refreshing=false;updateRefreshButton();return;}
+        refreshing=false;lastPoll=SystemClock.elapsedRealtime();
+        mergeLocal(s.devices);devices=s.devices;
+        if(s.walletLoaded){wallet=s.wallet;store.wallet(phone,wallet);}
+        save();
+        if(!silent)message=s.warning;
+        if(silent)renderDevices();else showDevices();
+        updateRefreshButton();
+    }
+    private void failSync(Exception e,boolean silent,int epoch,int revision){
+        if(silent)syncing=false;
+        refreshing=false;
+        if(epoch!=generation||isFinishing())return;
+        if(handleExpired(e))return;
+        if(revision!=operationVersion||loginPage){updateRefreshButton();return;}
+        if(silent){updateRefreshButton();return;}
+        for(Device d:devices){d.status=-1;d.checkedAt=0;}
+        message=safeError(e);showDevices();
+    }
+    private void mergeLocal(List<Device> incoming){
+        for(Device n:incoming){for(Device old:devices)if(old.id.equals(n.id)){n.pinned=old.pinned;if(!old.name.isEmpty())n.name=old.name;break;}}
     }
     private void control(Device d,boolean start){
         if(busy)return;operationVersion++;final String t=token;final boolean wasRunning=d.running;final long previousStart=d.ownStart;

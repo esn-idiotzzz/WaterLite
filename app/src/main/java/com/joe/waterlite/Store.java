@@ -50,6 +50,8 @@ final class Store {
         String name="devices." + phone, value=a.toString();
         if (!value.equals(prefs.getString(name, "[]"))) prefs.edit().putString(name, value).apply();
     }
+    String wallet(String phone) { return prefs.getString("wallet." + phone, ""); }
+    void wallet(String phone, String value) { if (!value.equals(prefs.getString("wallet." + phone, ""))) prefs.edit().putString("wallet." + phone, value).apply(); }
     Set<String> hidden(String phone) { return new HashSet<>(prefs.getStringSet("hidden." + phone, Collections.emptySet())); }
     void hidden(String phone, Set<String> ids) throws Exception { if (!ids.equals(hidden(phone))) prefs.edit().putStringSet("hidden." + phone, new HashSet<>(ids)).apply(); }
     long cooldown() { return prefs.getLong("smsDeadline", 0); }

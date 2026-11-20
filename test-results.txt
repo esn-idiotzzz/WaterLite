@@ -1,9 +1,9 @@
-WaterLite 1.3.0 / versionCode 6
-MuMu Player Android 12 (1080x1920, 420dpi); drinking service responses mocked, no real SMS or dispenser commands.
-Both color themes run the same instrumentation suite. Tests also exercise a real force-stop cold start and live GitHub release metadata.
+WaterLite 1.3.1 / versionCode 7
+MuMu Player Android 15 (1080x1920, 420dpi); drinking service responses mocked, no real SMS or dispenser commands.
+Both color themes run the same instrumentation suite. Tests also exercise silent startup, wallet persistence, a real force-stop cold start and live GitHub release metadata.
 
 [light]
-PASS 96 checks
+PASS 97 checks
 No session opens login screen
 Keystore encryption round trip
 Token is not stored in plaintext
@@ -15,6 +15,7 @@ Malformed DID rejected
 QR decoder synthetic camera frame
 SMS login UI stores received token
 Authenticated device list sync
+Wallet summary persists for the next launch
 Control token uses platform 1,1
 App login signature matches protocol vector
 Current device protocol headers
@@ -102,11 +103,21 @@ Delete action exposes an accessible label
 Confirmed delete removes and persistently hides device
 
 [dark]
-PASS 95 checks (same suite before the final empty-state screenshot check; fixed MIUI night palette, contrast and dialog accent verified)
+PASS 97 checks (fixed MIUI night palette, contrast and dialog accent verified)
+
+[startup]
+PASS 6 checks
+Startup sync never enters refresh mode
+Startup does not show refresh text
+Startup sync stays silent
+Startup sync keeps cached devices
+Startup sync refreshes each device status
+Startup sync persists wallet summary
 
 [cold]
-PASS 3 checks
+PASS 4 checks
 Encrypted session survives force-stop and process restart
+Cold startup sync is silent
 Killed process resumes with idle hardware after first fresh status
 Cold-start idle recovery does not wait five polling rounds
 

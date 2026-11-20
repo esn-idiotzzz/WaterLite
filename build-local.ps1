@@ -22,8 +22,8 @@ Copy-Item "$taskBuild\resources.apk" "$taskBuild\unsigned.apk" -Force
 Push-Location "$taskBuild\dex"
 try { Invoke-Checked "$taskTools\build-tools\aapt.exe" @('add',"$taskBuild\unsigned.apk",'classes.dex') } finally { Pop-Location }
 Invoke-Checked "$taskTools\build-tools\zipalign.exe" @('-f','4',"$taskBuild\unsigned.apk", "$taskBuild\aligned.apk")
-Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'sign','--ks',$SigningKey,'--ks-key-alias','waterlite','--ks-pass',"file:$PasswordFile",'--out',"$taskBuild\WaterLite-1.3.0.apk", "$taskBuild\aligned.apk")
-Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'verify',"$taskBuild\WaterLite-1.3.0.apk")
+Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'sign','--ks',$SigningKey,'--ks-key-alias','waterlite','--ks-pass',"file:$PasswordFile",'--out',"$taskBuild\WaterLite-1.3.1.apk", "$taskBuild\aligned.apk")
+Invoke-Checked "$taskJava\java.exe" @('-jar',"$taskTools\build-tools\lib\apksigner.jar",'verify',"$taskBuild\WaterLite-1.3.1.apk")
 if ($Tests) {
     New-Item -ItemType Directory -Force "$taskBuild\test-classes", "$taskBuild\test-dex" | Out-Null
     $taskTests = Get-ChildItem "$taskSource\app\src\androidTest\java" -Recurse -Filter '*.java' | ForEach-Object FullName
